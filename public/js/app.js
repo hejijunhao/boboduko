@@ -75,6 +75,63 @@ const sound = (() => {
   };
 })();
 
+/* ══════════════════════ themes ══════════════════════ */
+// Cosmetic reskins — a body class swaps the CSS-variable palette (and, for
+// coffee, the mascot). Per-player, persisted locally, never sent over the wire.
+
+const THEMES = {
+  pastel: {
+    name: 'Pastel Picnic', blurb: 'soft pinks & dumpling dreams',
+    tagline: 'the cutest sudoku in town 🍥', toast: '🍡 Back to the picnic!',
+    themeColor: '#fdf1f5',
+  },
+  coffee: {
+    name: "Bobo's Coffee Shop", blurb: 'fueled by happy thoughts and coffee',
+    tagline: 'fueled by happy thoughts & coffee ☕', toast: '☕ Welcome to the coffee shop!',
+    themeColor: '#eee6cc',
+  },
+  candy: {
+    name: 'Candy Pop', blurb: 'rainbow numbers, sugar-rush squares',
+    tagline: 'sweet squares, sweeter you 🍬', toast: '🍬 Sugar rush activated!',
+    themeColor: '#fdeff8',
+  },
+};
+
+let currentTheme = 'pastel';
+
+function applyTheme(key, { silent = false } = {}) {
+  if (!THEMES[key]) key = 'pastel';
+  currentTheme = key;
+  for (const k of Object.keys(THEMES)) document.body.classList.remove(`theme-${k}`);
+  document.body.classList.add(`theme-${key}`);
+  document.getElementById('tagline').textContent = THEMES[key].tagline;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', THEMES[key].themeColor);
+  document.querySelectorAll('.theme-card').forEach((c) => c.classList.toggle('on', c.dataset.theme === key));
+  try { localStorage.setItem('boboduko-theme', key); } catch { /* private mode */ }
+  if (!silent) toast(THEMES[key].toast);
+}
+
+function buildThemeList() {
+  const list = document.getElementById('theme-list');
+  list.innerHTML = '';
+  for (const [key, spec] of Object.entries(THEMES)) {
+    const card = document.createElement('button');
+    card.className = `theme-card theme-${key}`;
+    card.dataset.action = 'pick-theme';
+    card.dataset.theme = key;
+    // coffee shows its real logo; the others show a live mini-board preview
+    const art = key === 'coffee'
+      ? `<img class="theme-logo" src="img/coffee-logo.png" alt="Bobo's Coffee Shop logo">`
+      : `<div class="mini-board">${Array.from({ length: 9 }, (_, i) =>
+          `<div class="cell${i % 2 === 0 ? ' given' : ''}" data-v="${i + 1}"><span class="val">${i + 1}</span></div>`).join('')}</div>`;
+    card.innerHTML = `
+      <div class="theme-art">${art}</div>
+      <div class="theme-info"><b>${spec.name}</b><span>${spec.blurb}</span></div>
+      <span class="theme-check">✓</span>`;
+    list.appendChild(card);
+  }
+}
+
 /* ══════════════════════ helpers ══════════════════════ */
 
 const $ = (id) => document.getElementById(id);
@@ -244,6 +301,7 @@ function buildBoard() {
 function renderCell(i) {
   const cell = cellEls[i];
   const v = game.board[i];
+  cell.dataset.v = v || ''; // lets themes style digits per value
   if (v !== 0) {
     cell.innerHTML = `<span class="val">${v}</span>`;
     cell.classList.toggle('error', v !== game.solution[i]);
@@ -760,6 +818,12 @@ document.body.addEventListener('click', (e) => {
     case 'race':
       showScreen('screen-race');
       break;
+    case 'themes':
+      showScreen('screen-themes');
+      break;
+    case 'pick-theme':
+      applyTheme(btn.dataset.theme);
+      break;
     case 'race-create':
       pendingRaceCreate = true;
       $('difficulty-title').textContent = 'Pick a race difficulty';
@@ -836,6 +900,10 @@ homeMascot.addEventListener('pointerdown', () => {
 
 buildDifficultyList();
 buildNumpad();
+buildThemeList();
+let savedTheme = 'pastel';
+try { savedTheme = localStorage.getItem('boboduko-theme') || 'pastel'; } catch { /* fine */ }
+applyTheme(savedTheme, { silent: true });
 
 const roomParam = new URLSearchParams(location.search).get('room');
 if (roomParam && roomParam.length === 4) {

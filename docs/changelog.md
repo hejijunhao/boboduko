@@ -3,6 +3,61 @@
 All notable changes to Boboduko are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions follow semver.
 
+## [1.1.0] — 2026-08-06
+
+Themes: cosmetic reskins of the whole app, chosen per player and persisted
+locally — purely visual, so multiplayer needs no protocol changes.
+
+### Added — Theme system (`public/css/style.css`, `public/js/app.js`, `public/index.html`)
+
+- **Three themes**: 🍡 *Pastel Picnic* (the original look, now the default
+  theme), ☕ *Bobo's Coffee Shop*, and 🍬 *Candy Pop*. Picker lives behind a
+  new "🎨 Themes" button on the home screen; choice is applied instantly,
+  stored in `localStorage` (`boboduko-theme`), and restored on boot. Each
+  theme also re-words the home tagline and updates the browser `theme-color`.
+- **Architecture: a theme is a CSS class carrying variable overrides**
+  (`.theme-coffee`, `.theme-candy`, plus `.theme-pastel` restating the
+  `:root` defaults). *Why a class and not just `:root` swaps:* the same class
+  works on `<body>` (whole app) and on any container — which is what makes
+  the picker's live mini-board previews possible. Groundwork for this was
+  variable-izing the previously hardcoded pink shadow tint (`--shadow-rgb`)
+  and body background glows (`--glow1..3`).
+- **Scoping rule learned the hard way**: per-digit colors/tilts are expressed
+  as CSS *variables* (`--d1..--d9`, `--tilt-a..d`) consumed by neutral base
+  rules (`.cell[data-v="1"] .val { color: var(--d1, inherit) }`), not as
+  `.theme-candy .cell …` descendant selectors. *Why:* descendant selectors
+  match preview cards *through* the body's theme class, so a pastel preview
+  inside a candy body would have gone rainbow; `var()` resolves at the
+  nearest ancestor definition, and `--d1: initial` in a theme block cleanly
+  re-neutralizes an inherited value (`initial` = guaranteed-invalid for
+  custom properties, triggering the `inherit` fallback).
+- **☕ Bobo's Coffee Shop** — built from the two user-supplied logo PNGs
+  (root dir → copied to `public/img/coffee-logo.png` and `coffee-cup.png`;
+  originals untouched). Palette sampled from the artwork with PIL: cream
+  `#eee6cc`, royal blue `#0b38a9` — the app background matches the logo's
+  baked-in cream exactly, so the full logo (used as the picker card art)
+  sits seamlessly. The transparent cup mascot replaces Bobo's dumpling SVG
+  everywhere (home, game header, lobby, result card) via CSS; caramel tones
+  take over the secondary accent; the home wordmark restyles lowercase blue
+  to echo the logo.
+- **🍬 Candy Pop** — the "modifies the numbers" theme: every digit 1–9 gets
+  its own candy color (givens and entries alike, on both board and numpad)
+  plus a sticker-sheet tilt (±2–4° via `nth-child` patterns). *Legibility
+  choices:* digits stay digits (no symbol substitution), the nine hues are
+  chosen for mutual contrast on white, wrong entries stay `--error` red via
+  a rule ordered after the digit-color hooks, and tilts use the CSS `rotate`
+  property so they compose with (not fight) the pop animation's `transform`.
+- **Renderer hook**: cells now expose `data-v="<value>"`
+  (`renderCell` in `app.js`) so pure CSS can style digits per value — no
+  theme logic in JS beyond the body class swap.
+
+### Added — Tests
+
+- `client.test.js` grew a themes leg: picker opens with 3 cards and the
+  active one checked, coffee applies + persists + re-words the tagline,
+  switching leaves exactly one `theme-*` class on `<body>`, and board cells'
+  `data-v` matches their value (29 checks total across the suites).
+
 ## [1.0.0] — 2026-08-06
 
 Initial release: a browser-based, mobile-first sudoku game with no-login

@@ -25,6 +25,9 @@ Open it on your phone too — everything is touch-sized and the board scales to 
   survey the board, tap again or tap any cell to exit.
 - **Cute engineering** — Bobo the dumpling mascot blinks, bounces, and reacts to your moves;
   confetti (with hearts) on wins; soft pastel everything.
+- **Themes** — 🎨 dress up the board: 🍡 Pastel Picnic (default), ☕ Bobo's Coffee Shop
+  (cream + royal blue, starring the shop's real cup mascot), and 🍬 Candy Pop (every digit
+  its own candy color, sticker-tilted but still perfectly legible). Per-player, saved locally.
 
 ## Playing with friends on other devices
 

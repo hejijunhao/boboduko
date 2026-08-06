@@ -19,7 +19,11 @@
   --line-soft: #f3d9e3;
   --line-strong: #dfb8ca;
   --radius: 22px;
-  --shadow: 0 6px 0 rgba(220, 170, 190, 0.35);
+  --shadow-rgb: 220, 170, 190;
+  --shadow: 0 6px 0 rgba(var(--shadow-rgb), 0.35);
+  --glow1: #ffe5ec;
+  --glow2: #e3f7ef;
+  --glow3: #efe5fb;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -29,9 +33,9 @@ html, body { height: 100%; }
 body {
   font-family: 'Baloo 2', 'Comic Sans MS', ui-rounded, system-ui, sans-serif;
   background:
-    radial-gradient(circle at 15% 20%, #ffe5ec 0%, transparent 45%),
-    radial-gradient(circle at 85% 80%, #e3f7ef 0%, transparent 45%),
-    radial-gradient(circle at 80% 10%, #efe5fb 0%, transparent 40%),
+    radial-gradient(circle at 15% 20%, var(--glow1) 0%, transparent 45%),
+    radial-gradient(circle at 85% 80%, var(--glow2) 0%, transparent 45%),
+    radial-gradient(circle at 80% 10%, var(--glow3) 0%, transparent 40%),
     var(--bg);
   color: var(--ink);
   overflow: hidden;
@@ -77,7 +81,7 @@ button { font-family: inherit; color: inherit; }
   box-shadow: var(--shadow);
   transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
 }
-.btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(220, 170, 190, 0.35); }
+.btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(var(--shadow-rgb), 0.35); }
 .btn:hover { filter: brightness(1.03); }
 
 .btn-big { font-size: 1.25rem; padding: 18px 30px; width: 100%; }
@@ -125,7 +129,7 @@ button { font-family: inherit; color: inherit; }
   font-weight: 800;
   letter-spacing: -1px;
   color: var(--pink);
-  text-shadow: 0 3px 0 #fff, 0 6px 0 rgba(220, 170, 190, 0.4);
+  text-shadow: 0 3px 0 #fff, 0 6px 0 rgba(var(--shadow-rgb), 0.4);
 }
 .logo span { color: var(--lav); }
 
@@ -148,7 +152,7 @@ button { font-family: inherit; color: inherit; }
   position: absolute;
   bottom: 2px;
   width: 80px; height: 14px;
-  background: rgba(220, 170, 190, 0.35);
+  background: rgba(var(--shadow-rgb), 0.35);
   border-radius: 50%;
   animation: shadow-bob 2.6s ease-in-out infinite;
 }
@@ -232,7 +236,7 @@ button { font-family: inherit; color: inherit; }
   transition: transform 0.12s, box-shadow 0.12s;
   text-align: left;
 }
-.diff-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(220, 170, 190, 0.35); }
+.diff-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 rgba(var(--shadow-rgb), 0.35); }
 .diff-emoji { font-size: 1.8rem; }
 .diff-name { font-size: 1.15rem; font-weight: 700; }
 .diff-sub { font-size: 0.8rem; color: var(--ink-soft); font-weight: 600; }
@@ -334,7 +338,7 @@ button { font-family: inherit; color: inherit; }
   padding: 5px 12px;
   font-size: 0.85rem;
   font-weight: 700;
-  box-shadow: 0 3px 0 rgba(220, 170, 190, 0.25);
+  box-shadow: 0 3px 0 rgba(var(--shadow-rgb), 0.25);
   white-space: nowrap;
 }
 .pill b { color: var(--pink); }
@@ -366,7 +370,7 @@ button { font-family: inherit; color: inherit; }
   height: 16px;
   background: #fff;
   border-radius: 999px;
-  box-shadow: inset 0 2px 3px rgba(220, 170, 190, 0.35);
+  box-shadow: inset 0 2px 3px rgba(var(--shadow-rgb), 0.35);
 }
 .race-fill {
   position: absolute;
@@ -408,7 +412,7 @@ button { font-family: inherit; color: inherit; }
   border: 3px solid var(--line-strong);
   border-radius: 18px;
   overflow: hidden;
-  box-shadow: 0 8px 0 rgba(220, 170, 190, 0.3);
+  box-shadow: 0 8px 0 rgba(var(--shadow-rgb), 0.3);
   gap: 1px;
 }
 
@@ -506,7 +510,7 @@ button { font-family: inherit; color: inherit; }
   cursor: pointer;
   background: #fff;
   border-radius: 16px;
-  box-shadow: 0 4px 0 rgba(220, 170, 190, 0.3);
+  box-shadow: 0 4px 0 rgba(var(--shadow-rgb), 0.3);
   padding: 8px 4px;
   display: flex;
   flex-direction: column;
@@ -517,7 +521,7 @@ button { font-family: inherit; color: inherit; }
   color: var(--ink-soft);
   transition: transform 0.1s, box-shadow 0.1s;
 }
-.ctrl:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(220, 170, 190, 0.3); }
+.ctrl:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shadow-rgb), 0.3); }
 .ctrl-emoji { font-size: 1.25rem; }
 .ctrl.on { background: var(--lav-soft); color: var(--ink); }
 #notes-state { color: var(--pink); }
@@ -535,7 +539,7 @@ button { font-family: inherit; color: inherit; }
   cursor: pointer;
   background: #fff;
   border-radius: 14px;
-  box-shadow: 0 4px 0 rgba(220, 170, 190, 0.3);
+  box-shadow: 0 4px 0 rgba(var(--shadow-rgb), 0.3);
   padding: 8px 0 6px;
   display: flex;
   flex-direction: column;
@@ -546,12 +550,12 @@ button { font-family: inherit; color: inherit; }
   line-height: 1.1;
   transition: transform 0.1s, box-shadow 0.1s, opacity 0.2s;
 }
-.num-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(220, 170, 190, 0.3); }
+.num-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shadow-rgb), 0.3); }
 .num-btn small { font-size: 0.62rem; color: var(--ink-soft); font-weight: 700; }
 .num-btn.done { opacity: 0.35; } /* stays tappable — it spotlights the digit */
 .num-btn.hl {
-  background: linear-gradient(180deg, var(--lav-soft), #cdb9f2);
-  box-shadow: 0 4px 0 rgba(150, 120, 200, 0.5);
+  background: linear-gradient(180deg, var(--lav-soft), var(--lav));
+  box-shadow: 0 4px 0 rgba(var(--shadow-rgb), 0.5);
   transform: translateY(-2px);
 }
 
@@ -637,6 +641,229 @@ button { font-family: inherit; color: inherit; }
   pointer-events: none;
   z-index: 100;
 }
+
+/* ═══════════════ themes ═══════════════
+   Each theme is a class carrying CSS-variable overrides, so it works on
+   <body> (whole app) AND on any container (the picker's live previews).
+   Digit colors/tilts are variables too — var() resolves at the NEAREST
+   ancestor definition, so a pastel preview card stays pastel inside a
+   candy-themed body (a descendant selector could not do that). */
+
+.cell[data-v="1"] .val { color: var(--d1, inherit); }
+.cell[data-v="2"] .val { color: var(--d2, inherit); }
+.cell[data-v="3"] .val { color: var(--d3, inherit); }
+.cell[data-v="4"] .val { color: var(--d4, inherit); }
+.cell[data-v="5"] .val { color: var(--d5, inherit); }
+.cell[data-v="6"] .val { color: var(--d6, inherit); }
+.cell[data-v="7"] .val { color: var(--d7, inherit); }
+.cell[data-v="8"] .val { color: var(--d8, inherit); }
+.cell[data-v="9"] .val { color: var(--d9, inherit); }
+.cell.error .val { color: var(--error); } /* wrong always beats candy colors */
+
+/* sticker-sheet tilt (rotate composes with the pop animation's transform) */
+.cell .val { rotate: var(--tilt-a, none); }
+.cell:nth-child(2n) .val { rotate: var(--tilt-b, none); }
+.cell:nth-child(3n) .val { rotate: var(--tilt-c, none); }
+.cell:nth-child(7n) .val { rotate: var(--tilt-d, none); }
+
+/* 🍡 Pastel Picnic — the :root defaults, restated as a class so a pastel
+   preview card can reset itself inside a differently-themed body. */
+.theme-pastel {
+  --bg: #fdf1f5;
+  --bg2: #fef8f2;
+  --ink: #5c4a56;
+  --ink-soft: #9b8494;
+  --pink: #ff8fab;
+  --pink-soft: #ffc2d1;
+  --pink-pale: #ffe5ec;
+  --mint: #6fd8b2;
+  --mint-soft: #bdf0dd;
+  --lav: #b79ced;
+  --lav-soft: #e3d7fb;
+  --sun: #ffd166;
+  --error: #ff6b81;
+  --cell: #ffffff;
+  --cell-given: #fff3e6;
+  --line-soft: #f3d9e3;
+  --line-strong: #dfb8ca;
+  --shadow-rgb: 220, 170, 190;
+  --glow1: #ffe5ec;
+  --glow2: #e3f7ef;
+  --glow3: #efe5fb;
+  --d1: initial; --d2: initial; --d3: initial; --d4: initial; --d5: initial;
+  --d6: initial; --d7: initial; --d8: initial; --d9: initial;
+  --tilt-a: initial; --tilt-b: initial; --tilt-c: initial; --tilt-d: initial;
+}
+
+/* ☕ Bobo's Coffee Shop — cream + royal blue, colors sampled from the logo */
+.theme-coffee {
+  --bg: #eee6cc;
+  --bg2: #f6f0dd;
+  --ink: #14349b;
+  --ink-soft: #7580b5;
+  --pink: #0b38a9;
+  --pink-soft: #7f97e0;
+  --pink-pale: #dde4f8;
+  --mint: #c08a4e;
+  --mint-soft: #ead6b6;
+  --lav: #4a6ad4;
+  --lav-soft: #ccd8f6;
+  --sun: #e2b34a;
+  --error: #d95f4e;
+  --cell: #f9f4e3;
+  --cell-given: #efe6c9;
+  --line-soft: #e2d9bc;
+  --line-strong: #c4b88d;
+  --shadow-rgb: 197, 187, 148;
+  --glow1: #f3ecd4;
+  --glow2: #e4e6f2;
+  --glow3: #efe4c8;
+  --d1: initial; --d2: initial; --d3: initial; --d4: initial; --d5: initial;
+  --d6: initial; --d7: initial; --d8: initial; --d9: initial;
+  --tilt-a: initial; --tilt-b: initial; --tilt-c: initial; --tilt-d: initial;
+}
+
+/* the shop's real mascot takes over from the dumpling */
+.theme-coffee .mascot svg, .theme-coffee .mini-mascot svg { display: none; }
+.theme-coffee .mascot, .theme-coffee .mini-mascot {
+  background: url('../img/coffee-cup.png') center / contain no-repeat;
+}
+.theme-coffee .logo,
+.theme-coffee .logo span {
+  color: var(--pink);
+  text-transform: lowercase;
+  letter-spacing: -2px;
+  text-shadow: none;
+}
+
+/* 🍬 Candy Pop — every digit its own candy color, slightly tilted */
+.theme-candy {
+  --bg: #fdeff8;
+  --bg2: #fffafd;
+  --ink: #6b4a63;
+  --ink-soft: #ab8aa2;
+  --pink: #ff6fa5;
+  --pink-soft: #ffb1cf;
+  --pink-pale: #ffe3f0;
+  --mint: #3fd0a0;
+  --mint-soft: #b5f0dd;
+  --lav: #9d7bf0;
+  --lav-soft: #e2d6ff;
+  --sun: #ffce4f;
+  --error: #ff4d6d;
+  --cell: #ffffff;
+  --cell-given: #f8f0fc;
+  --line-soft: #f6d7ec;
+  --line-strong: #eeb6dc;
+  --shadow-rgb: 238, 170, 210;
+  --glow1: #ffe1f1;
+  --glow2: #dff4ff;
+  --glow3: #fff3c9;
+  /* every digit its own candy color (givens and entries alike) */
+  --d1: #ef476f; --d2: #f78c2a; --d3: #d5a000; --d4: #2fae72; --d5: #2e9fd8;
+  --d6: #6c6ce0; --d7: #a24fd8; --d8: #e84a9e; --d9: #92603f;
+  --tilt-a: -2deg; --tilt-b: 2.5deg; --tilt-c: -3.5deg; --tilt-d: 4deg;
+}
+
+.theme-candy .num-btn[data-n="1"] { color: #ef476f; }
+.theme-candy .num-btn[data-n="2"] { color: #f78c2a; }
+.theme-candy .num-btn[data-n="3"] { color: #d5a000; }
+.theme-candy .num-btn[data-n="4"] { color: #2fae72; }
+.theme-candy .num-btn[data-n="5"] { color: #2e9fd8; }
+.theme-candy .num-btn[data-n="6"] { color: #6c6ce0; }
+.theme-candy .num-btn[data-n="7"] { color: #a24fd8; }
+.theme-candy .num-btn[data-n="8"] { color: #e84a9e; }
+.theme-candy .num-btn[data-n="9"] { color: #92603f; }
+
+/* ─────────────── theme picker ─────────────── */
+
+.theme-list {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin: 10px auto auto;
+  padding-bottom: 30px;
+}
+
+.theme-card {
+  position: relative;
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius);
+  overflow: hidden;
+  padding: 0;
+  text-align: left;
+  background: var(--bg2);
+  box-shadow: 0 6px 0 rgba(var(--shadow-rgb), 0.35);
+  transition: transform 0.12s, box-shadow 0.12s;
+}
+.theme-card:active { transform: translateY(3px); box-shadow: 0 2px 0 rgba(var(--shadow-rgb), 0.35); }
+
+.theme-art {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 20% 25%, var(--glow1) 0%, transparent 55%),
+    radial-gradient(circle at 85% 75%, var(--glow2) 0%, transparent 55%),
+    var(--bg);
+}
+.theme-art .theme-logo { width: 170px; display: block; border-radius: 10px; }
+.theme-card.theme-pastel .theme-art::after,
+.theme-card.theme-candy .theme-art::after {
+  position: absolute;
+  right: 14px;
+  bottom: 10px;
+  font-size: 1.7rem;
+  rotate: 12deg;
+}
+.theme-card.theme-pastel .theme-art::after { content: '🍡'; }
+.theme-card.theme-candy .theme-art::after { content: '🍬'; }
+
+.mini-board {
+  --size: 230px; /* drives .cell font-size */
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2px;
+  width: 132px;
+  background: var(--line-strong);
+  border: 2px solid var(--line-strong);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.mini-board .cell { aspect-ratio: 1; cursor: pointer; }
+
+.theme-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 12px 18px 14px;
+  color: var(--ink);
+}
+.theme-info b { font-size: 1.1rem; }
+.theme-info span { font-size: 0.82rem; color: var(--ink-soft); font-weight: 600; }
+
+.theme-check {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--mint);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.12);
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.15s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.theme-card.on .theme-check { opacity: 1; transform: scale(1); }
 
 /* ─────────────── small screens / landscape tweaks ─────────────── */
 

@@ -120,6 +120,40 @@ click($$('#result-buttons .btn')[1]);
 if (active() !== 'screen-home') fail('home button did not go home');
 ok('back home after win');
 
+/* ───────── themes ───────── */
+
+click($('[data-action="themes"]'));
+if (active() !== 'screen-themes') fail('themes button did not open themes screen');
+const cards = $$('#theme-list .theme-card');
+if (cards.length !== 3) fail(`expected 3 theme cards, got ${cards.length}`);
+if (!cards.find((c) => c.dataset.theme === 'pastel').classList.contains('on')) fail('default theme not marked as active');
+if (!$('.theme-card.theme-coffee .theme-logo')) fail('coffee card missing logo art');
+
+click(cards.find((c) => c.dataset.theme === 'coffee'));
+if (!window.document.body.classList.contains('theme-coffee')) fail('coffee theme not applied to body');
+if (window.localStorage.getItem('boboduko-theme') !== 'coffee') fail('theme choice not persisted');
+if (!$('#tagline').textContent.includes('coffee')) fail('tagline not re-worded by theme');
+
+click(cards.find((c) => c.dataset.theme === 'candy'));
+const themeClasses = [...window.document.body.classList].filter((c) => c.startsWith('theme-'));
+if (themeClasses.join() !== 'theme-candy') fail(`body should carry exactly theme-candy, got: ${themeClasses}`);
+if (!cards.find((c) => c.dataset.theme === 'candy').classList.contains('on')) fail('check mark did not move');
+ok('theme picker applies, persists, re-words the tagline, and swaps cleanly');
+
+// board cells expose their value for per-digit candy styling
+click($('[data-action="back-home"]'));
+click($('[data-action="solo"]'));
+click($$('#difficulty-list .diff-btn')[0]);
+const themedGiven = $$('#board .cell').find((c) => c.classList.contains('given'));
+if (themedGiven.dataset.v !== themedGiven.querySelector('.val').textContent) fail('data-v does not match cell value');
+ok('cells expose data-v so themes can color digits per value');
+click($('[data-action="quit-game"]'));
+
+// back to pastel for the race leg
+click($('[data-action="themes"]'));
+click($$('#theme-list .theme-card')[0]);
+click($('[data-action="back-home"]'));
+
 /* ───────── race: jsdom client vs raw ws guest ───────── */
 
 click($('[data-action="race"]'));
