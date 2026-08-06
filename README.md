@@ -28,8 +28,10 @@ Open it on your phone too — everything is touch-sized and the board scales to 
 - **Themes** — 🎨 dress up the board: 🍡 Pastel Picnic (default), ☕ Bobo's Coffee Shop
   (cream + royal blue, starring the shop's real cup mascot), 🍬 Candy Pop (every digit
   its own candy color, sticker-tilted but still perfectly legible), plus one theme per
-  Mahjong suit — 🎋 Bamboo Grove, 🀙 Lucky Circles (dot-tile digit colors), and
-  🀄 Ten Thousand (tiny cinnabar hanzi beside every digit). Per-player, saved locally.
+  Mahjong suit that draws digits as **real tile faces** — 🎋 Bamboo Grove (stick
+  arrangements, with the bird for 1), 🀙 Lucky Circles (painted dots in blue, green,
+  and cinnabar), and 🀄 Ten Thousand (hanzi 一–九 stamped with a cinnabar 萬). The
+  numpad wears the matching faces as a built-in legend. Per-player, saved locally.
 
 ## Playing with friends on other devices
 

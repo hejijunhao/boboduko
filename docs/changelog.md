@@ -3,6 +3,55 @@
 All notable changes to Boboduko are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions follow semver.
 
+## [1.3.0] — 2026-08-06
+
+The Mahjong themes stop borrowing Western numerals: each suit now draws
+digits 1–9 as its **real tile face**. Still zero theme logic in JS — the
+whole feature is two new CSS-variable families riding the existing
+`data-v` hooks, so the picker's mini-boards preview the faces for free.
+
+### Changed — Mahjong digits are now tile faces (`public/css/style.css`)
+
+- **🎋 Bamboo Grove** — digits render as the 索子 stick arrangements
+  (2 = two sticks, 9 = a 3×3 lattice…), and 1 is the bird, faithful to real
+  tile sets. Sticks are rounded-rect silhouettes in an inline-SVG mask.
+- **🀙 Lucky Circles** — digits render as the 筒子 dot arrangements
+  (1 = the big ◉, 5 = a quincunx, 7 = three slanted over four…). The 1.2.0
+  blue/green/cinnabar `--d1..9` trio now colors the dots themselves.
+- **🀄 Ten Thousand** — the hanzi numeral (一…九) *is* the digit now, set in
+  a brush-serif stack (`Kaiti SC` → `KaiTi` → `serif`), and the ornament
+  hook flips meaning: every tile wears a small cinnabar **萬** at its
+  bottom-right (`--h1..9` are all `萬` — the suit marker, not the number).
+- **Mechanism, in the 1.1.0 leak-proof style** — two new var families
+  consumed by neutral base rules on `.cell[data-v] .val::after`:
+  - `--g1..9`: text-glyph faces (hanzi) via `content`;
+  - `--m1..9` + `--face-bg: currentColor`: mask-image faces (sticks/dots)
+    — *masks, not background images*, so the artwork is painted in
+    `currentColor` and the cascade keeps working: givens stay ink, entries
+    stay accent, the `--d1..9` cycle tints per digit, and **a wrong entry
+    turns its whole face error-red** exactly like a numeral used to.
+  - `--numeral-fill: transparent` hides the Arabic digit via
+    `-webkit-text-fill-color` rather than removing it — `color` (which
+    `text-fill-color` shadows) still flows to the pseudo-element faces, and
+    the digit stays in the DOM for screen readers and the jsdom suite.
+- **The numpad wears the same faces** (`.num-btn[data-n]::before`), so it
+  doubles as the suit's legend — the remaining-count badge stays Arabic and
+  visible. Pencil notes stay Arabic numerals too, deliberately: nine
+  micro-tiles in one cell would be noise, and notes are the player's own
+  annotations, not tiles.
+- Reset groups extended for the new families (`--g/--m/--face-*/--orn-*/`
+  `--numeral-fill`), same rule as before: each theme appears only in the
+  groups whose decorations it does **not** define.
+- Registry blurbs updated to describe the faces (`public/js/app.js`); no
+  other JS.
+
+### Added — Tests
+
+- `client.test.js`: after the suit-theme leg, the stylesheet itself is
+  checked — each suit theme must define all nine face vars (`--m1..9` for
+  the drawn suits, `--g1..9` for 萬子) and `--numeral-fill: transparent`,
+  guarding against a theme silently falling back to plain numerals.
+
 ## [1.2.0] — 2026-08-06
 
 Three new themes, one per Mahjong suit — the suits are numbered 1–9 exactly

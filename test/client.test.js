@@ -152,6 +152,20 @@ for (const suit of ['bamboo', 'circles', 'chars']) {
 }
 ok('all three mahjong suit themes apply and persist');
 
+// each suit theme must draw all nine digits as tile faces from CSS vars
+// (mask artwork for the stick/dot suits, hanzi glyphs for 萬子) and hide
+// the plain numeral underneath — jsdom doesn't paint, so we check the sheet
+const css = await readFile(new URL('../public/css/style.css', import.meta.url), 'utf8');
+for (const [suit, face] of [['bamboo', '--m'], ['circles', '--m'], ['chars', '--g']]) {
+  const block = css.match(new RegExp(`\\.theme-${suit} \\{[^}]*\\}`))?.[0];
+  if (!block) fail(`no .theme-${suit} block in style.css`);
+  for (let n = 1; n <= 9; n++) {
+    if (!block.includes(`${face}${n}:`)) fail(`${suit} theme missing tile face ${face}${n}`);
+  }
+  if (!block.includes('--numeral-fill: transparent')) fail(`${suit} theme does not hide the plain numeral`);
+}
+ok('every suit theme defines nine tile faces and hides the numeral');
+
 // board cells expose their value for per-digit candy styling
 click($('[data-action="back-home"]'));
 click($('[data-action="solo"]'));

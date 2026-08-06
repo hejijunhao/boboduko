@@ -96,17 +96,17 @@ const THEMES = {
     themeColor: '#fdeff8',
   },
   bamboo: {
-    name: 'Bamboo Grove', blurb: 'ivory tiles on mahjong-table greens',
+    name: 'Bamboo Grove', blurb: 'digits are stick tiles — and 1 is the bird',
     tagline: 'grow your grid, shoot by shoot 🎋', toast: '🎋 Welcome to the grove!',
     themeColor: '#e8f0dd',
   },
   circles: {
-    name: 'Lucky Circles', blurb: 'porcelain blues, dot-tile digit colors',
+    name: 'Lucky Circles', blurb: 'digits are painted dot tiles, count the circles',
     tagline: 'connect all the dots 🀙', toast: '🀙 Round and round we go!',
     themeColor: '#e9f1f7',
   },
   chars: {
-    name: 'Ten Thousand', blurb: 'rice paper, ink & cinnabar hanzi',
+    name: 'Ten Thousand', blurb: 'digits are hanzi 一–九, stamped with a cinnabar 萬',
     tagline: 'ten thousand tiny victories 🀄', toast: '🀄 Ten thousand blessings!',
     themeColor: '#f7f0e2',
   },

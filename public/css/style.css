@@ -535,6 +535,7 @@ button { font-family: inherit; color: inherit; }
   padding: 6px 4px calc(10px + env(safe-area-inset-bottom));
 }
 .num-btn {
+  position: relative; /* anchors the ::before tile face (mahjong themes) */
   border: none;
   cursor: pointer;
   background: #fff;
@@ -549,9 +550,10 @@ button { font-family: inherit; color: inherit; }
   color: var(--ink);
   line-height: 1.1;
   transition: transform 0.1s, box-shadow 0.1s, opacity 0.2s;
+  -webkit-text-fill-color: var(--numeral-fill, currentColor);
 }
 .num-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 rgba(var(--shadow-rgb), 0.3); }
-.num-btn small { font-size: 0.62rem; color: var(--ink-soft); font-weight: 700; }
+.num-btn small { font-size: 0.62rem; color: var(--ink-soft); font-weight: 700; -webkit-text-fill-color: currentColor; }
 .num-btn.done { opacity: 0.35; } /* stays tappable — it spotlights the digit */
 .num-btn.hl {
   background: linear-gradient(180deg, var(--lav-soft), var(--lav));
@@ -672,11 +674,74 @@ button { font-family: inherit; color: inherit; }
 .cell[data-v="9"] .val::before { content: var(--h9, ''); }
 .cell .val::before {
   position: absolute;
-  top: -0.3em;
-  right: -0.8em;
-  font-size: 0.38em;
+  top: var(--orn-top, -0.3em);
+  right: var(--orn-right, -0.8em);
+  font-size: var(--orn-size, 0.38em);
   font-weight: 800;
+  font-family: var(--face-font, inherit);
   color: var(--ornament-color, currentColor);
+  -webkit-text-fill-color: currentColor; /* stays visible when the numeral hides */
+}
+
+/* per-digit tile faces (mahjong suits) — a theme swaps the numeral for its
+   suit's real tile art. Two var families, leak-proof like --d/--h:
+   --g1..9 are text glyphs (hanzi), --m1..9 are mask shapes (dot/stick
+   arrangements) painted in currentColor via --face-bg — so the cascade's
+   semantic color (given/entry ink, the --dN cycle, error red) tints the face.
+   The numeral hides through --numeral-fill: text-fill-color keeps `color`
+   itself flowing to the pseudos, and the digit stays in the DOM for
+   screen readers, copy/paste, and the jsdom tests. */
+.cell .val { -webkit-text-fill-color: var(--numeral-fill, currentColor); }
+.cell[data-v="1"] .val::after { content: var(--g1, ''); -webkit-mask-image: var(--m1, none); mask-image: var(--m1, none); }
+.cell[data-v="2"] .val::after { content: var(--g2, ''); -webkit-mask-image: var(--m2, none); mask-image: var(--m2, none); }
+.cell[data-v="3"] .val::after { content: var(--g3, ''); -webkit-mask-image: var(--m3, none); mask-image: var(--m3, none); }
+.cell[data-v="4"] .val::after { content: var(--g4, ''); -webkit-mask-image: var(--m4, none); mask-image: var(--m4, none); }
+.cell[data-v="5"] .val::after { content: var(--g5, ''); -webkit-mask-image: var(--m5, none); mask-image: var(--m5, none); }
+.cell[data-v="6"] .val::after { content: var(--g6, ''); -webkit-mask-image: var(--m6, none); mask-image: var(--m6, none); }
+.cell[data-v="7"] .val::after { content: var(--g7, ''); -webkit-mask-image: var(--m7, none); mask-image: var(--m7, none); }
+.cell[data-v="8"] .val::after { content: var(--g8, ''); -webkit-mask-image: var(--m8, none); mask-image: var(--m8, none); }
+.cell[data-v="9"] .val::after { content: var(--g9, ''); -webkit-mask-image: var(--m9, none); mask-image: var(--m9, none); }
+.cell .val::after {
+  position: absolute;
+  left: 50%; top: 50%;
+  translate: -50% -50%;
+  width: 1.44em; height: 1.44em;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  font-size: var(--face-size, 1em);
+  font-family: var(--face-font, inherit);
+  -webkit-text-fill-color: currentColor;
+  background: var(--face-bg, none);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-size: contain; mask-size: contain;
+}
+
+/* the numpad wears the same faces — it doubles as the legend for the suit */
+.num-btn[data-n="1"]::before { content: var(--g1, ''); -webkit-mask-image: var(--m1, none); mask-image: var(--m1, none); color: var(--d1, inherit); }
+.num-btn[data-n="2"]::before { content: var(--g2, ''); -webkit-mask-image: var(--m2, none); mask-image: var(--m2, none); color: var(--d2, inherit); }
+.num-btn[data-n="3"]::before { content: var(--g3, ''); -webkit-mask-image: var(--m3, none); mask-image: var(--m3, none); color: var(--d3, inherit); }
+.num-btn[data-n="4"]::before { content: var(--g4, ''); -webkit-mask-image: var(--m4, none); mask-image: var(--m4, none); color: var(--d4, inherit); }
+.num-btn[data-n="5"]::before { content: var(--g5, ''); -webkit-mask-image: var(--m5, none); mask-image: var(--m5, none); color: var(--d5, inherit); }
+.num-btn[data-n="6"]::before { content: var(--g6, ''); -webkit-mask-image: var(--m6, none); mask-image: var(--m6, none); color: var(--d6, inherit); }
+.num-btn[data-n="7"]::before { content: var(--g7, ''); -webkit-mask-image: var(--m7, none); mask-image: var(--m7, none); color: var(--d7, inherit); }
+.num-btn[data-n="8"]::before { content: var(--g8, ''); -webkit-mask-image: var(--m8, none); mask-image: var(--m8, none); color: var(--d8, inherit); }
+.num-btn[data-n="9"]::before { content: var(--g9, ''); -webkit-mask-image: var(--m9, none); mask-image: var(--m9, none); color: var(--d9, inherit); }
+.num-btn::before {
+  position: absolute;
+  inset: 5px 0 auto;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  line-height: 1;
+  font-size: 1.35rem;
+  font-family: var(--face-font, inherit);
+  -webkit-text-fill-color: currentColor;
+  background: var(--face-bg, none);
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-size: contain; mask-size: contain;
 }
 
 /* mahjong-tile "thickness" on cells, opt-in per theme */
@@ -805,6 +870,20 @@ button { font-family: inherit; color: inherit; }
   --glow2: #f6f3d8;
   --glow3: #d8ecdf;
   --tile-edge: inset 0 -3px 0 rgba(47, 82, 51, 0.09);
+  /* real 索子 faces: N sticks replace the numeral — and 1 is the bird, as on
+     actual tiles. Masks painted in currentColor, so givens stay ink-dark,
+     entries bamboo-green, and mistakes error-red. */
+  --numeral-fill: transparent;
+  --face-bg: currentColor;
+  --m1: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Cpath d='M12 29L28 23 26 38Z'/%3E%3Cpath d='M30 16L36 7 41 17Z'/%3E%3Ccircle cx='36' cy='32' r='14'/%3E%3Cellipse cx='53' cy='57' rx='20' ry='18'/%3E%3Cpath d='M66 47L88 27 84 55Z'/%3E%3Crect x='44' y='73' width='4' height='9'/%3E%3Crect x='56' y='73' width='4' height='9'/%3E%3C/svg%3E");
+  --m2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='43' y='17' width='10' height='26' rx='5'/%3E%3Crect x='43' y='53' width='10' height='26' rx='5'/%3E%3C/svg%3E");
+  --m3: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='43' y='15' width='10' height='26' rx='5'/%3E%3Crect x='25' y='55' width='10' height='26' rx='5'/%3E%3Crect x='61' y='55' width='10' height='26' rx='5'/%3E%3C/svg%3E");
+  --m4: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='27' y='17' width='10' height='26' rx='5'/%3E%3Crect x='59' y='17' width='10' height='26' rx='5'/%3E%3Crect x='27' y='53' width='10' height='26' rx='5'/%3E%3Crect x='59' y='53' width='10' height='26' rx='5'/%3E%3C/svg%3E");
+  --m5: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='23' y='15' width='10' height='26' rx='5'/%3E%3Crect x='63' y='15' width='10' height='26' rx='5'/%3E%3Crect x='43' y='35' width='10' height='26' rx='5'/%3E%3Crect x='23' y='55' width='10' height='26' rx='5'/%3E%3Crect x='63' y='55' width='10' height='26' rx='5'/%3E%3C/svg%3E");
+  --m6: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='21' y='17' width='10' height='26' rx='5'/%3E%3Crect x='43' y='17' width='10' height='26' rx='5'/%3E%3Crect x='65' y='17' width='10' height='26' rx='5'/%3E%3Crect x='21' y='53' width='10' height='26' rx='5'/%3E%3Crect x='43' y='53' width='10' height='26' rx='5'/%3E%3Crect x='65' y='53' width='10' height='26' rx='5'/%3E%3C/svg%3E");
+  --m7: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='43' y='11' width='10' height='22' rx='5'/%3E%3Crect x='21' y='41' width='10' height='22' rx='5'/%3E%3Crect x='43' y='41' width='10' height='22' rx='5'/%3E%3Crect x='65' y='41' width='10' height='22' rx='5'/%3E%3Crect x='21' y='69' width='10' height='22' rx='5'/%3E%3Crect x='43' y='69' width='10' height='22' rx='5'/%3E%3Crect x='65' y='69' width='10' height='22' rx='5'/%3E%3C/svg%3E");
+  --m8: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='17' y='17' width='9' height='26' rx='4'/%3E%3Crect x='35' y='17' width='9' height='26' rx='4'/%3E%3Crect x='52' y='17' width='9' height='26' rx='4'/%3E%3Crect x='70' y='17' width='9' height='26' rx='4'/%3E%3Crect x='17' y='53' width='9' height='26' rx='4'/%3E%3Crect x='35' y='53' width='9' height='26' rx='4'/%3E%3Crect x='52' y='53' width='9' height='26' rx='4'/%3E%3Crect x='70' y='53' width='9' height='26' rx='4'/%3E%3C/svg%3E");
+  --m9: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Crect x='21' y='14' width='10' height='20' rx='5'/%3E%3Crect x='43' y='14' width='10' height='20' rx='5'/%3E%3Crect x='65' y='14' width='10' height='20' rx='5'/%3E%3Crect x='21' y='38' width='10' height='20' rx='5'/%3E%3Crect x='43' y='38' width='10' height='20' rx='5'/%3E%3Crect x='65' y='38' width='10' height='20' rx='5'/%3E%3Crect x='21' y='62' width='10' height='20' rx='5'/%3E%3Crect x='43' y='62' width='10' height='20' rx='5'/%3E%3Crect x='65' y='62' width='10' height='20' rx='5'/%3E%3C/svg%3E");
 }
 
 /* 🀙 Lucky Circles — 筒子: porcelain blues, digits cycle the dot-tile trio */
@@ -834,6 +913,20 @@ button { font-family: inherit; color: inherit; }
   /* blue / green / cinnabar, like the painted circles on real tiles */
   --d1: #2b6cb0; --d2: #2f855a; --d3: #c53030; --d4: #2b6cb0; --d5: #c53030;
   --d6: #2f855a; --d7: #2b6cb0; --d8: #2f855a; --d9: #c53030;
+  /* real 筒子 faces: N painted dots replace the numeral (1 is the big ◉);
+     masks fill with currentColor, so the --dN trio above colors the dots
+     and error red still wins on mistakes */
+  --numeral-fill: transparent;
+  --face-bg: currentColor;
+  --m1: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='48' cy='48' r='30' fill='none' stroke='black' stroke-width='10'/%3E%3Ccircle cx='48' cy='48' r='12'/%3E%3C/svg%3E");
+  --m2: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='48' cy='28' r='16'/%3E%3Ccircle cx='48' cy='68' r='16'/%3E%3C/svg%3E");
+  --m3: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='26' cy='26' r='14'/%3E%3Ccircle cx='48' cy='48' r='14'/%3E%3Ccircle cx='70' cy='70' r='14'/%3E%3C/svg%3E");
+  --m4: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='30' cy='30' r='14'/%3E%3Ccircle cx='66' cy='30' r='14'/%3E%3Ccircle cx='30' cy='66' r='14'/%3E%3Ccircle cx='66' cy='66' r='14'/%3E%3C/svg%3E");
+  --m5: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='27' cy='27' r='13'/%3E%3Ccircle cx='69' cy='27' r='13'/%3E%3Ccircle cx='48' cy='48' r='11'/%3E%3Ccircle cx='27' cy='69' r='13'/%3E%3Ccircle cx='69' cy='69' r='13'/%3E%3C/svg%3E");
+  --m6: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='32' cy='26' r='12'/%3E%3Ccircle cx='64' cy='26' r='12'/%3E%3Ccircle cx='32' cy='48' r='12'/%3E%3Ccircle cx='64' cy='48' r='12'/%3E%3Ccircle cx='32' cy='70' r='12'/%3E%3Ccircle cx='64' cy='70' r='12'/%3E%3C/svg%3E");
+  --m7: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='20' cy='17' r='10'/%3E%3Ccircle cx='46' cy='23' r='10'/%3E%3Ccircle cx='72' cy='29' r='10'/%3E%3Ccircle cx='32' cy='54' r='11'/%3E%3Ccircle cx='64' cy='54' r='11'/%3E%3Ccircle cx='32' cy='78' r='11'/%3E%3Ccircle cx='64' cy='78' r='11'/%3E%3C/svg%3E");
+  --m8: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='32' cy='19' r='10'/%3E%3Ccircle cx='64' cy='19' r='10'/%3E%3Ccircle cx='32' cy='39' r='10'/%3E%3Ccircle cx='64' cy='39' r='10'/%3E%3Ccircle cx='32' cy='58' r='10'/%3E%3Ccircle cx='64' cy='58' r='10'/%3E%3Ccircle cx='32' cy='78' r='10'/%3E%3Ccircle cx='64' cy='78' r='10'/%3E%3C/svg%3E");
+  --m9: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 96 96'%3E%3Ccircle cx='25' cy='25' r='11'/%3E%3Ccircle cx='48' cy='25' r='11'/%3E%3Ccircle cx='71' cy='25' r='11'/%3E%3Ccircle cx='25' cy='48' r='11'/%3E%3Ccircle cx='48' cy='48' r='11'/%3E%3Ccircle cx='71' cy='48' r='11'/%3E%3Ccircle cx='25' cy='71' r='11'/%3E%3Ccircle cx='48' cy='71' r='11'/%3E%3Ccircle cx='71' cy='71' r='11'/%3E%3C/svg%3E");
 }
 
 /* 🀄 Ten Thousand — 萬子: rice paper, ink digits, tiny cinnabar hanzi */
@@ -860,9 +953,19 @@ button { font-family: inherit; color: inherit; }
   --glow2: #f6dcd2;
   --glow3: #efe9da;
   --tile-edge: inset 0 -3px 0 rgba(58, 47, 42, 0.09);
-  --h1: '一'; --h2: '二'; --h3: '三'; --h4: '四'; --h5: '五';
-  --h6: '六'; --h7: '七'; --h8: '八'; --h9: '九';
+  /* real 萬子 faces: the hanzi numeral IS the digit now, brush-serif where
+     the platform has one; every tile wears the suit marker 萬 in cinnabar
+     (bottom-right) instead of the old numeral-superscript arrangement */
+  --numeral-fill: transparent;
+  --face-font: 'Kaiti SC', 'STKaiti', 'KaiTi', 'Songti SC', 'SimSun', serif;
+  --face-size: 0.92em; /* a hair under digit size: air for the 萬 stamp */
+  --g1: '一'; --g2: '二'; --g3: '三'; --g4: '四'; --g5: '五';
+  --g6: '六'; --g7: '七'; --g8: '八'; --g9: '九';
+  --h1: '萬'; --h2: '萬'; --h3: '萬'; --h4: '萬'; --h5: '萬';
+  --h6: '萬'; --h7: '萬'; --h8: '萬'; --h9: '萬';
   --ornament-color: #c22f2f;
+  --orn-top: 2.75em;   /* own-em units (0.38 × cell em): below the hanzi… */
+  --orn-right: -1.05em; /* …nestled bottom-right, but safely inside the cell */
 }
 
 /* Digit decorations are opt-in; every other theme resets what a themed
@@ -879,9 +982,19 @@ button { font-family: inherit; color: inherit; }
   --h1: initial; --h2: initial; --h3: initial; --h4: initial; --h5: initial;
   --h6: initial; --h7: initial; --h8: initial; --h9: initial;
   --ornament-color: initial;
+  --orn-top: initial; --orn-right: initial; --orn-size: initial;
+  --g1: initial; --g2: initial; --g3: initial; --g4: initial; --g5: initial;
+  --g6: initial; --g7: initial; --g8: initial; --g9: initial;
+  --face-font: initial; --face-size: initial;
+}
+.theme-pastel, .theme-coffee, .theme-candy, .theme-chars {
+  --m1: initial; --m2: initial; --m3: initial; --m4: initial; --m5: initial;
+  --m6: initial; --m7: initial; --m8: initial; --m9: initial;
+  --face-bg: initial;
 }
 .theme-pastel, .theme-coffee, .theme-candy {
   --tile-edge: initial;
+  --numeral-fill: initial;
 }
 
 .theme-candy .num-btn[data-n="1"] { color: #ef476f; }
