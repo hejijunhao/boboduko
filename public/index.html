@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#fdf1f5">
+  <title>Boboduko 🍡 cute sudoku</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍡</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ═══════════ HOME ═══════════ -->
+  <section id="screen-home" class="screen active">
+    <div class="home-inner">
+      <div class="mascot-stage">
+        <div id="mascot" class="mascot"></div>
+        <div class="mascot-shadow"></div>
+      </div>
+      <h1 class="logo">Bobo<span>duko</span></h1>
+      <p class="tagline">the cutest sudoku in town 🍥</p>
+      <div class="home-buttons">
+        <button class="btn btn-big btn-pink" data-action="solo">🧩 Play Solo</button>
+        <button class="btn btn-big btn-mint" data-action="race">⚡ Race a Friend</button>
+      </div>
+      <p class="footnote">no accounts, no ads, just puzzles 💗</p>
+    </div>
+  </section>
+
+  <!-- ═══════════ DIFFICULTY PICKER ═══════════ -->
+  <section id="screen-difficulty" class="screen">
+    <header class="top-bar">
+      <button class="btn btn-icon" data-action="back-home" aria-label="Back">←</button>
+      <h2 id="difficulty-title">Pick a difficulty</h2>
+      <span class="top-bar-spacer"></span>
+    </header>
+    <div class="difficulty-list" id="difficulty-list"></div>
+  </section>
+
+  <!-- ═══════════ RACE MENU ═══════════ -->
+  <section id="screen-race" class="screen">
+    <header class="top-bar">
+      <button class="btn btn-icon" data-action="back-home" aria-label="Back">←</button>
+      <h2>Race a Friend</h2>
+      <span class="top-bar-spacer"></span>
+    </header>
+    <div class="race-menu">
+      <div class="race-card">
+        <div class="race-card-emoji">🏁</div>
+        <h3>Start a race</h3>
+        <p>Get a room code to share — same puzzle, fastest paws win!</p>
+        <button class="btn btn-pink" data-action="race-create">Create room</button>
+      </div>
+      <div class="race-card">
+        <div class="race-card-emoji">🎟️</div>
+        <h3>Join a race</h3>
+        <p>Got a code from a friend? Type it here!</p>
+        <div class="join-row">
+          <input id="join-code" type="text" inputmode="latin" autocomplete="off"
+                 maxlength="4" placeholder="CODE" aria-label="Room code">
+          <button class="btn btn-mint" data-action="race-join">Join</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════ LOBBY (waiting for opponent) ═══════════ -->
+  <section id="screen-lobby" class="screen">
+    <header class="top-bar">
+      <button class="btn btn-icon" data-action="lobby-leave" aria-label="Back">←</button>
+      <h2>Waiting room</h2>
+      <span class="top-bar-spacer"></span>
+    </header>
+    <div class="lobby-inner">
+      <div class="mascot-stage small">
+        <div class="mascot lobby-mascot"></div>
+        <div class="mascot-shadow"></div>
+      </div>
+      <p id="lobby-status">Share this code with a friend!</p>
+      <div class="room-code" id="room-code" title="Tap to copy">····</div>
+      <button class="btn btn-lav" data-action="copy-link">🔗 Copy invite link</button>
+      <p class="lobby-hint" id="lobby-difficulty"></p>
+      <div class="waiting-dots"><span></span><span></span><span></span></div>
+    </div>
+  </section>
+
+  <!-- ═══════════ GAME ═══════════ -->
+  <section id="screen-game" class="screen">
+    <header class="top-bar game-bar">
+      <button class="btn btn-icon" data-action="quit-game" aria-label="Back">←</button>
+      <div class="game-stats">
+        <span id="stat-difficulty" class="pill"></span>
+        <span class="pill">💧 <b id="stat-mistakes">0</b></span>
+        <span class="pill">⏱️ <b id="stat-timer">0:00</b></span>
+      </div>
+      <div id="mini-mascot" class="mini-mascot"></div>
+    </header>
+
+    <div id="race-hud" class="race-hud hidden">
+      <div class="racer">
+        <span class="racer-name" id="racer-me">You</span>
+        <div class="race-track"><div class="race-fill me" id="race-fill-me"></div><span class="race-runner" id="race-runner-me">🐰</span></div>
+      </div>
+      <div class="racer">
+        <span class="racer-name" id="racer-them">Friend</span>
+        <div class="race-track"><div class="race-fill them" id="race-fill-them"></div><span class="race-runner" id="race-runner-them">🐢</span></div>
+      </div>
+    </div>
+
+    <div class="board-wrap">
+      <div id="board" class="board" role="grid" aria-label="Sudoku board"></div>
+    </div>
+
+    <div class="controls">
+      <button class="ctrl" data-action="undo"><span class="ctrl-emoji">↩️</span><span>Undo</span></button>
+      <button class="ctrl" data-action="erase"><span class="ctrl-emoji">🧽</span><span>Erase</span></button>
+      <button class="ctrl" data-action="notes" id="ctrl-notes"><span class="ctrl-emoji">✏️</span><span>Notes <b id="notes-state">off</b></span></button>
+      <button class="ctrl" data-action="hint"><span class="ctrl-emoji">🌟</span><span>Hint</span></button>
+    </div>
+
+    <div class="numpad" id="numpad"></div>
+  </section>
+
+  <!-- ═══════════ OVERLAYS ═══════════ -->
+  <div id="countdown-overlay" class="overlay hidden">
+    <div id="countdown-number" class="countdown-number">3</div>
+  </div>
+
+  <div id="result-overlay" class="overlay hidden">
+    <div class="result-card">
+      <div id="result-mascot" class="mascot result-mascot"></div>
+      <h2 id="result-title">You did it!</h2>
+      <p id="result-sub">So smart, so cute.</p>
+      <div class="result-stats" id="result-stats"></div>
+      <div class="result-buttons" id="result-buttons"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <canvas id="confetti" class="confetti"></canvas>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
