@@ -125,7 +125,7 @@ ok('back home after win');
 click($('[data-action="themes"]'));
 if (active() !== 'screen-themes') fail('themes button did not open themes screen');
 const cards = $$('#theme-list .theme-card');
-if (cards.length !== 3) fail(`expected 3 theme cards, got ${cards.length}`);
+if (cards.length !== 6) fail(`expected 6 theme cards, got ${cards.length}`);
 if (!cards.find((c) => c.dataset.theme === 'pastel').classList.contains('on')) fail('default theme not marked as active');
 if (!$('.theme-card.theme-coffee .theme-logo')) fail('coffee card missing logo art');
 
@@ -139,6 +139,18 @@ const themeClasses = [...window.document.body.classList].filter((c) => c.startsW
 if (themeClasses.join() !== 'theme-candy') fail(`body should carry exactly theme-candy, got: ${themeClasses}`);
 if (!cards.find((c) => c.dataset.theme === 'candy').classList.contains('on')) fail('check mark did not move');
 ok('theme picker applies, persists, re-words the tagline, and swaps cleanly');
+
+// the mahjong suit themes apply like any other, with mini-board previews
+for (const suit of ['bamboo', 'circles', 'chars']) {
+  const card = cards.find((c) => c.dataset.theme === suit);
+  if (!card) fail(`missing theme card: ${suit}`);
+  if (!card.querySelector('.mini-board')) fail(`${suit} card missing mini-board preview`);
+  click(card);
+  const cls = [...window.document.body.classList].filter((c) => c.startsWith('theme-'));
+  if (cls.join() !== `theme-${suit}`) fail(`body should carry exactly theme-${suit}, got: ${cls}`);
+  if (window.localStorage.getItem('boboduko-theme') !== suit) fail(`${suit} not persisted`);
+}
+ok('all three mahjong suit themes apply and persist');
 
 // board cells expose their value for per-digit candy styling
 click($('[data-action="back-home"]'));

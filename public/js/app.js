@@ -95,6 +95,21 @@ const THEMES = {
     tagline: 'sweet squares, sweeter you 🍬', toast: '🍬 Sugar rush activated!',
     themeColor: '#fdeff8',
   },
+  bamboo: {
+    name: 'Bamboo Grove', blurb: 'ivory tiles on mahjong-table greens',
+    tagline: 'grow your grid, shoot by shoot 🎋', toast: '🎋 Welcome to the grove!',
+    themeColor: '#e8f0dd',
+  },
+  circles: {
+    name: 'Lucky Circles', blurb: 'porcelain blues, dot-tile digit colors',
+    tagline: 'connect all the dots 🀙', toast: '🀙 Round and round we go!',
+    themeColor: '#e9f1f7',
+  },
+  chars: {
+    name: 'Ten Thousand', blurb: 'rice paper, ink & cinnabar hanzi',
+    tagline: 'ten thousand tiny victories 🀄', toast: '🀄 Ten thousand blessings!',
+    themeColor: '#f7f0e2',
+  },
 };
 
 let currentTheme = 'pastel';

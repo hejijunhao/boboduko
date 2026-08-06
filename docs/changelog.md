@@ -3,6 +3,45 @@
 All notable changes to Boboduko are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions follow semver.
 
+## [1.2.0] — 2026-08-06
+
+Three new themes, one per Mahjong suit — the suits are numbered 1–9 exactly
+like sudoku digits, so each theme borrows its suit's real tile language.
+Built entirely on the 1.1.0 theme system (variable-class blocks + `data-v`
+digit hooks); no new JS beyond three registry entries.
+
+### Added — Mahjong suit themes (`public/css/style.css`, `public/js/app.js`)
+
+- **🎋 Bamboo Grove (索子)** — ivory tile cells on mahjong-table greens with a
+  bamboo-green primary; palette-only (like Coffee Shop), letting the tile look
+  carry the theme.
+- **🀙 Lucky Circles (筒子)** — porcelain blues; digits cycle blue → green →
+  cinnabar through values 1–9 via the existing `--d1..9` variables. *Why a
+  trio, not a rainbow:* real circle tiles are painted in exactly those three
+  ink colors, and it keeps the look distinct from Candy Pop.
+- **🀄 Ten Thousand (萬子)** — rice-paper cream, ink-dark digits, cinnabar-red
+  accents. Each digit wears a tiny red hanzi superscript (一二三…九), echoing
+  the 萬 tiles. *Legibility rule:* the Arabic digit stays primary; the hanzi
+  is a 0.38 em ornament. Error red is shifted pinker (`#ff4d6d`) so mistakes
+  never blend into the cinnabar brand color.
+- **New CSS hooks, same leak-proof pattern as 1.1.0**: hanzi ornaments render
+  from `--h1..--h9` + `--ornament-color` through neutral base rules
+  (`.cell[data-v="1"] .val::before { content: var(--h1, '') }`), and all
+  three suit themes share a subtle "tile thickness" inset shadow via
+  `--tile-edge`. Per-theme `--x: initial` resets are now *grouped* rules
+  (one per decoration family) instead of repeated per-block boilerplate —
+  each theme appears only in the groups whose decorations it does **not**
+  define, so the disjoint property sets can never conflict.
+- Picker cards for the suits carry real Unicode mahjong-tile badges
+  (🀙 / 🀄) where fonts support them; six cards total, still built
+  automatically from the `THEMES` registry.
+
+### Added — Tests
+
+- `client.test.js`: picker now expects 6 cards; a new leg applies each suit
+  theme and asserts exactly one `theme-*` body class plus persistence
+  (30 checks total).
+
 ## [1.1.0] — 2026-08-06
 
 Themes: cosmetic reskins of the whole app, chosen per player and persisted

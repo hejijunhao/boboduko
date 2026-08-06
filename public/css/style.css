@@ -660,8 +660,30 @@ button { font-family: inherit; color: inherit; }
 .cell[data-v="9"] .val { color: var(--d9, inherit); }
 .cell.error .val { color: var(--error); } /* wrong always beats candy colors */
 
+/* per-digit hanzi ornament (mahjong characters suit) — tiny superscript */
+.cell[data-v="1"] .val::before { content: var(--h1, ''); }
+.cell[data-v="2"] .val::before { content: var(--h2, ''); }
+.cell[data-v="3"] .val::before { content: var(--h3, ''); }
+.cell[data-v="4"] .val::before { content: var(--h4, ''); }
+.cell[data-v="5"] .val::before { content: var(--h5, ''); }
+.cell[data-v="6"] .val::before { content: var(--h6, ''); }
+.cell[data-v="7"] .val::before { content: var(--h7, ''); }
+.cell[data-v="8"] .val::before { content: var(--h8, ''); }
+.cell[data-v="9"] .val::before { content: var(--h9, ''); }
+.cell .val::before {
+  position: absolute;
+  top: -0.3em;
+  right: -0.8em;
+  font-size: 0.38em;
+  font-weight: 800;
+  color: var(--ornament-color, currentColor);
+}
+
+/* mahjong-tile "thickness" on cells, opt-in per theme */
+.cell { box-shadow: var(--tile-edge, none); }
+
 /* sticker-sheet tilt (rotate composes with the pop animation's transform) */
-.cell .val { rotate: var(--tilt-a, none); }
+.cell .val { position: relative; rotate: var(--tilt-a, none); }
 .cell:nth-child(2n) .val { rotate: var(--tilt-b, none); }
 .cell:nth-child(3n) .val { rotate: var(--tilt-c, none); }
 .cell:nth-child(7n) .val { rotate: var(--tilt-d, none); }
@@ -690,9 +712,6 @@ button { font-family: inherit; color: inherit; }
   --glow1: #ffe5ec;
   --glow2: #e3f7ef;
   --glow3: #efe5fb;
-  --d1: initial; --d2: initial; --d3: initial; --d4: initial; --d5: initial;
-  --d6: initial; --d7: initial; --d8: initial; --d9: initial;
-  --tilt-a: initial; --tilt-b: initial; --tilt-c: initial; --tilt-d: initial;
 }
 
 /* ☕ Bobo's Coffee Shop — cream + royal blue, colors sampled from the logo */
@@ -718,9 +737,6 @@ button { font-family: inherit; color: inherit; }
   --glow1: #f3ecd4;
   --glow2: #e4e6f2;
   --glow3: #efe4c8;
-  --d1: initial; --d2: initial; --d3: initial; --d4: initial; --d5: initial;
-  --d6: initial; --d7: initial; --d8: initial; --d9: initial;
-  --tilt-a: initial; --tilt-b: initial; --tilt-c: initial; --tilt-d: initial;
 }
 
 /* the shop's real mascot takes over from the dumpling */
@@ -763,6 +779,109 @@ button { font-family: inherit; color: inherit; }
   --d1: #ef476f; --d2: #f78c2a; --d3: #d5a000; --d4: #2fae72; --d5: #2e9fd8;
   --d6: #6c6ce0; --d7: #a24fd8; --d8: #e84a9e; --d9: #92603f;
   --tilt-a: -2deg; --tilt-b: 2.5deg; --tilt-c: -3.5deg; --tilt-d: 4deg;
+}
+
+/* 🎋 Bamboo Grove — 索子: ivory tiles on fresh mahjong-table greens */
+.theme-bamboo {
+  --bg: #e8f0dd;
+  --bg2: #f3f8ea;
+  --ink: #2f5233;
+  --ink-soft: #7f9a80;
+  --pink: #3e8f4e;
+  --pink-soft: #8cc79a;
+  --pink-pale: #ddefe0;
+  --mint: #c9a55f;
+  --mint-soft: #ecdcb4;
+  --lav: #4a9d5f;
+  --lav-soft: #cfe8d4;
+  --sun: #e8c455;
+  --error: #d95f55;
+  --cell: #fdfbf0;
+  --cell-given: #f2ecd7;
+  --line-soft: #dfe7cd;
+  --line-strong: #a8bf95;
+  --shadow-rgb: 168, 191, 149;
+  --glow1: #ddefd8;
+  --glow2: #f6f3d8;
+  --glow3: #d8ecdf;
+  --tile-edge: inset 0 -3px 0 rgba(47, 82, 51, 0.09);
+}
+
+/* 🀙 Lucky Circles — 筒子: porcelain blues, digits cycle the dot-tile trio */
+.theme-circles {
+  --bg: #e9f1f7;
+  --bg2: #f5f9fc;
+  --ink: #274a68;
+  --ink-soft: #7e97ab;
+  --pink: #3673b5;
+  --pink-soft: #92b9e0;
+  --pink-pale: #dce9f6;
+  --mint: #4fb89a;
+  --mint-soft: #bde8da;
+  --lav: #5585c9;
+  --lav-soft: #d3e2f4;
+  --sun: #f0c05a;
+  --error: #d4544c;
+  --cell: #fbfdff;
+  --cell-given: #e7eef7;
+  --line-soft: #dbe6f0;
+  --line-strong: #a9c0d6;
+  --shadow-rgb: 169, 192, 214;
+  --glow1: #dcebf8;
+  --glow2: #d8f2ea;
+  --glow3: #fdf2d2;
+  --tile-edge: inset 0 -3px 0 rgba(39, 74, 104, 0.09);
+  /* blue / green / cinnabar, like the painted circles on real tiles */
+  --d1: #2b6cb0; --d2: #2f855a; --d3: #c53030; --d4: #2b6cb0; --d5: #c53030;
+  --d6: #2f855a; --d7: #2b6cb0; --d8: #2f855a; --d9: #c53030;
+}
+
+/* 🀄 Ten Thousand — 萬子: rice paper, ink digits, tiny cinnabar hanzi */
+.theme-chars {
+  --bg: #f7f0e2;
+  --bg2: #fcf7ec;
+  --ink: #3a2f2a;
+  --ink-soft: #9a8a7e;
+  --pink: #c22f2f;
+  --pink-soft: #e59a94;
+  --pink-pale: #f8e2de;
+  --mint: #c9a227;
+  --mint-soft: #eadfb8;
+  --lav: #a04a38;
+  --lav-soft: #ecd6cd;
+  --sun: #d9a404;
+  --error: #ff4d6d; /* pinker than the cinnabar brand red, so mistakes still read */
+  --cell: #fbf6ea;
+  --cell-given: #f0e7d3;
+  --line-soft: #e8ddc6;
+  --line-strong: #b9a888;
+  --shadow-rgb: 185, 168, 136;
+  --glow1: #f2e8d2;
+  --glow2: #f6dcd2;
+  --glow3: #efe9da;
+  --tile-edge: inset 0 -3px 0 rgba(58, 47, 42, 0.09);
+  --h1: '一'; --h2: '二'; --h3: '三'; --h4: '四'; --h5: '五';
+  --h6: '六'; --h7: '七'; --h8: '八'; --h9: '九';
+  --ornament-color: #c22f2f;
+}
+
+/* Digit decorations are opt-in; every other theme resets what a themed
+   <body> would otherwise leak into its preview card (--x: initial makes the
+   var guaranteed-invalid, so the base rules fall back to "plain"). */
+.theme-pastel, .theme-coffee, .theme-bamboo, .theme-chars {
+  --d1: initial; --d2: initial; --d3: initial; --d4: initial; --d5: initial;
+  --d6: initial; --d7: initial; --d8: initial; --d9: initial;
+}
+.theme-pastel, .theme-coffee, .theme-bamboo, .theme-circles, .theme-chars {
+  --tilt-a: initial; --tilt-b: initial; --tilt-c: initial; --tilt-d: initial;
+}
+.theme-pastel, .theme-coffee, .theme-candy, .theme-bamboo, .theme-circles {
+  --h1: initial; --h2: initial; --h3: initial; --h4: initial; --h5: initial;
+  --h6: initial; --h7: initial; --h8: initial; --h9: initial;
+  --ornament-color: initial;
+}
+.theme-pastel, .theme-coffee, .theme-candy {
+  --tile-edge: initial;
 }
 
 .theme-candy .num-btn[data-n="1"] { color: #ef476f; }
@@ -813,7 +932,10 @@ button { font-family: inherit; color: inherit; }
 }
 .theme-art .theme-logo { width: 170px; display: block; border-radius: 10px; }
 .theme-card.theme-pastel .theme-art::after,
-.theme-card.theme-candy .theme-art::after {
+.theme-card.theme-candy .theme-art::after,
+.theme-card.theme-bamboo .theme-art::after,
+.theme-card.theme-circles .theme-art::after,
+.theme-card.theme-chars .theme-art::after {
   position: absolute;
   right: 14px;
   bottom: 10px;
@@ -822,6 +944,9 @@ button { font-family: inherit; color: inherit; }
 }
 .theme-card.theme-pastel .theme-art::after { content: '🍡'; }
 .theme-card.theme-candy .theme-art::after { content: '🍬'; }
+.theme-card.theme-bamboo .theme-art::after { content: '🎋'; }
+.theme-card.theme-circles .theme-art::after { content: '🀙'; color: var(--ink); }
+.theme-card.theme-chars .theme-art::after { content: '🀄'; }
 
 .mini-board {
   --size: 230px; /* drives .cell font-size */
