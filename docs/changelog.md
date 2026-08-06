@@ -3,6 +3,65 @@
 All notable changes to Boboduko are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions follow semver.
 
+## [1.4.0] — 2026-08-06
+
+Mid-race "They ran away!" kicks, diagnosed and fixed. On Vercel the game
+runs as a serverless function, and the platform **cuts every WebSocket when
+the function hits its `maxDuration` (300 s on Hobby — not raisable)**; an
+empirical probe against production showed the opponent being kicked at
+exactly 300.0 s of socket life (close code 1006). The old code treated any
+socket death as "player left" and ended the game instantly. Now a dead
+socket is a hiccup: the server holds the seat during a grace period and the
+client silently reconnects and resumes — the same race, the same board.
+
+### Fixed — A dropped socket is no longer a forfeit (`server.js`, `public/js/app.js`)
+
+- **Players now have identity beyond their socket**: each seat carries a
+  `playerId` token (sent in `created`/`start`). *Why:* the server previously
+  identified players only by the live `ws` object, so even an instant
+  reconnect could not rejoin a game.
+- **Server grace period** (`BOBODUKO_GRACE_MS`, default 90 s): on socket
+  close the seat is kept and the opponent gets a soft `opponent_dropped`
+  (name pulses in the race HUD 📶) instead of the game-ending
+  `opponent_left`, which now fires only after the grace lapses or on an
+  explicit leave. A `resume { code, playerId }` message reattaches a fresh
+  socket to the seat and returns a full state snapshot (state, puzzle,
+  opponent presence + progress, verdict if the race ended while away);
+  the opponent gets `opponent_back`.
+- **Client auto-reconnect** with exponential backoff (≈45 s of attempts vs
+  the 90 s grace), per Vercel's own guidance for WebSocket clients. The
+  board is already all-local, so resuming only re-syncs the progress bars.
+  A lobby host who loses their socket reclaims the room the same way; if the
+  race started while they were away they are dropped straight into it.
+- **Wake-up liveness check**: on `visibilitychange` → visible the client
+  pings (new `ping`/`pong` messages) and force-recycles a zombie socket.
+  *Why:* phones freeze sockets on lock/background; the socket can look OPEN
+  yet be long dead on the server — this reclaims the seat within grace.
+- Progress pcts are remembered server-side per player so a resume can
+  restore the opponent's bar without waiting for their next move.
+
+### Added — Tests
+
+- `race.test.js`: ping/pong; mid-round socket death → `opponent_dropped`
+  with `graceSeconds`; resume reattaches the seat, returns the round, and
+  progress relays over the new socket; bogus `playerId` → `resume_failed`;
+  an expired grace converts the drop into a real `opponent_left`; a lobby
+  host survives a socket cut and reclaims the room. The runner shrinks the
+  grace to 1.5 s (`BOBODUKO_GRACE_MS`) so the expiry test stays fast.
+
+### Notes
+
+- The 300 s ceiling itself is a platform property. On a paid Vercel plan
+  `maxDuration` can be raised to 800 s (dashboard or `vercel.json`), which
+  makes cuts rarer — but they still happen (redeploys also sever every
+  socket), so reconnect-and-resume is the real fix either way.
+- Known limit: rooms still live in one function instance's memory. A
+  reconnect that lands on a *different* instance gets an honest
+  `resume_failed` ("The room is gone") instead of a silent hang. At
+  friends-and-family traffic there is effectively one warm instance, so
+  resumes land home; true multi-instance safety would need external state
+  (e.g. Redis), noted as future work.
+
 ## [1.3.0] — 2026-08-06
 
 The Mahjong themes stop borrowing Western numerals: each suit now draws

@@ -609,6 +609,19 @@ function showResult({ title, sub, mood, stats, buttons }) {
 
 function hideResult() { $('result-overlay').classList.add('hidden'); }
 
+/* Opponent left for good (explicit leave or expired grace) — win by default. */
+function showDefaultWin() {
+  showResult({
+    title: 'They ran away! 🏃',
+    sub: 'Your friend left — you win by default.',
+    mood: 'wow',
+    stats: soloStats(),
+    buttons: [
+      { label: '🏠 Home', cls: 'btn-lav', fn: () => { hideResult(); goHome(); } },
+    ],
+  });
+}
+
 function goHome() {
   stopTimer();
   net.leave();
@@ -621,9 +634,14 @@ function goHome() {
 const net = {
   ws: null,
   roomCode: null,
+  playerId: null,
   isHost: false,
   opponent: null,
+  oppConnected: true,
   rematchAsked: false,
+  reconnectTimer: null,
+  reconnectAttempt: 0,
+  pongTimer: null,
 
   connect() {
     return new Promise((resolve, reject) => {
@@ -632,17 +650,98 @@ const net = {
       const ws = new WebSocket(`${proto}://${location.host}`);
       ws.onopen = () => resolve();
       ws.onerror = () => reject(new Error('no connection'));
-      ws.onmessage = (e) => { try { this.onMessage(JSON.parse(e.data)); } catch { /* ignore junk */ } };
-      ws.onclose = () => {
-        if (this.roomCode && !game.finished) toast('💔 Connection lost');
-        this.ws = null;
+      // guards: a superseded socket must not speak for the current one
+      ws.onmessage = (e) => {
+        if (this.ws !== ws) return;
+        try { this.onMessage(JSON.parse(e.data)); } catch { /* ignore junk */ }
       };
+      ws.onclose = () => { if (this.ws === ws) this.handleClose(); };
       this.ws = ws;
     });
   },
 
   send(msg) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
+  },
+
+  /* ── reconnect & resume ──
+     The server cuts sockets routinely (serverless maxDuration, phone lock,
+     network handoff) but holds our seat for a grace period. A dead socket
+     is a hiccup to recover from, never "game over" by itself. */
+
+  handleClose() {
+    this.ws = null;
+    clearTimeout(this.pongTimer);
+    this.pongTimer = null;
+    if (!this.roomCode || !this.playerId) return; // not in a room — nothing to restore
+    if (this.reconnectAttempt === 0) toast('📶 Connection hiccup — reconnecting…');
+    this.scheduleReconnect();
+  },
+
+  scheduleReconnect() {
+    if (this.reconnectTimer || !this.roomCode) return;
+    if (this.reconnectAttempt >= 8) { // ~45s of retries; the server holds our seat for 90s
+      this.reconnectAttempt = 0;
+      this.dropOut('We couldn’t get back in — check your connection.');
+      return;
+    }
+    const delay = Math.min(500 * 2 ** this.reconnectAttempt, 10_000);
+    this.reconnectAttempt++;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.tryResume();
+    }, delay);
+  },
+
+  async tryResume() {
+    if (!this.roomCode) return;
+    try { await this.connect(); } catch { return this.scheduleReconnect(); }
+    this.send({ t: 'resume', code: this.roomCode, playerId: this.playerId });
+  },
+
+  /* Mobile browsers freeze sockets while backgrounded — on return the socket
+     can look OPEN but be long dead on the server. Verify with a ping. */
+  checkAlive() {
+    if (!this.roomCode) return;
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+      this.reconnectAttempt = 0;
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+      return this.tryResume();
+    }
+    this.send({ t: 'ping' });
+    clearTimeout(this.pongTimer);
+    this.pongTimer = setTimeout(() => { if (this.ws) this.ws.close(); }, 4000);
+  },
+
+  /* Reconnection genuinely failed — leave the race gracefully. */
+  dropOut(reason) {
+    const wasRacing = game.mode === 'race' && !game.finished;
+    this.roomCode = null;
+    this.playerId = null;
+    if (wasRacing) {
+      game.finished = true;
+      stopTimer();
+      showResult({
+        title: 'Connection lost 😿',
+        sub: reason,
+        mood: 'sad',
+        stats: soloStats(),
+        buttons: [{ label: '🏠 Home', cls: 'btn-lav', fn: () => { hideResult(); goHome(); } }],
+      });
+    } else {
+      toast(`😿 ${reason}`);
+      if ($('screen-lobby').classList.contains('active')) showScreen('screen-race');
+    }
+  },
+
+  setOppConnected(connected) {
+    this.oppConnected = connected;
+    const el = $('racer-them');
+    el.classList.toggle('dropped', !connected);
+    if (this.opponent) {
+      el.textContent = `${this.opponent.emoji} ${this.opponent.name}${connected ? '' : ' 📶'}`;
+    }
   },
 
   async create(difficulty) {
@@ -664,14 +763,64 @@ const net = {
   leave() {
     if (this.roomCode) this.send({ t: 'leave' });
     this.roomCode = null;
+    this.playerId = null;
     this.opponent = null;
+    this.oppConnected = true;
     this.rematchAsked = false;
+    this.reconnectAttempt = 0;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+  },
+
+  setupRaceHud(opponent) {
+    $('racer-me').textContent = `${me.emoji} ${me.name}`;
+    $('race-runner-me').textContent = me.emoji;
+    $('race-runner-them').textContent = opponent.emoji;
+    $('race-fill-me').style.width = '0%';
+    $('race-fill-them').style.width = '0%';
+    $('race-runner-me').style.left = '0%';
+    $('race-runner-them').style.left = '0%';
+    this.setOppConnected(true);
+  },
+
+  updateOppBar(pctRaw) {
+    const pct = Math.round((pctRaw || 0) * 100);
+    $('race-fill-them').style.width = `${pct}%`;
+    $('race-runner-them').style.left = `${pct}%`;
+  },
+
+  showRaceOver(youWin, canRematch = true) {
+    game.finished = true;
+    stopTimer();
+    const oppName = this.opponent ? this.opponent.name : 'Your friend';
+    const homeBtn = { label: '🏠 Home', cls: 'btn-lav', fn: () => { hideResult(); goHome(); } };
+    const buttons = canRematch ? this.rematchButtons() : [homeBtn];
+    if (youWin) {
+      showResult({
+        title: 'You win! 🏆',
+        sub: `You out-puzzled ${oppName}!`,
+        mood: 'celebrate',
+        stats: soloStats(),
+        buttons,
+      });
+      burstConfetti();
+      sound.win();
+    } else {
+      showResult({
+        title: 'So close! 🐢',
+        sub: `${oppName} finished first — rematch?`,
+        mood: 'sad',
+        stats: soloStats(),
+        buttons,
+      });
+    }
   },
 
   onMessage(msg) {
     switch (msg.t) {
       case 'created': {
         this.roomCode = msg.code;
+        this.playerId = msg.playerId;
         $('room-code').textContent = msg.code;
         $('lobby-status').textContent = 'Share this code with a friend!';
         $('lobby-difficulty').textContent =
@@ -681,67 +830,83 @@ const net = {
       }
       case 'start': {
         this.roomCode = msg.code;
+        this.playerId = msg.playerId;
         this.opponent = msg.opponent;
         this.rematchAsked = false;
         hideResult();
-        $('racer-me').textContent = `${me.emoji} ${me.name}`;
-        $('racer-them').textContent = `${msg.opponent.emoji} ${msg.opponent.name}`;
-        $('race-runner-me').textContent = me.emoji;
-        $('race-runner-them').textContent = msg.opponent.emoji;
-        $('race-fill-me').style.width = '0%';
-        $('race-fill-them').style.width = '0%';
-        $('race-runner-me').style.left = '0%';
-        $('race-runner-them').style.left = '0%';
+        this.setupRaceHud(msg.opponent);
         runCountdown(() => {
           startGame({ puzzle: msg.puzzle, solution: msg.solution, difficulty: msg.difficulty, mode: 'race' });
         });
         break;
       }
+      case 'resumed': {
+        this.reconnectAttempt = 0;
+        toast('✅ Reconnected!');
+        if (msg.state === 'waiting') break; // still alone in the lobby — nothing to restore
+        if (msg.opponent) this.opponent = { name: msg.opponent.name, emoji: msg.opponent.emoji };
+        if (msg.state === 'playing') {
+          const inThisRound = game.mode === 'race' && game.puzzle &&
+            JSON.stringify(game.puzzle) === JSON.stringify(msg.puzzle);
+          if (!inThisRound) {
+            // the round began while we were away (lobby drop) — jump straight in
+            hideResult();
+            this.setupRaceHud(this.opponent);
+            startGame({ puzzle: msg.puzzle, solution: msg.solution, difficulty: msg.difficulty, mode: 'race' });
+          }
+          this.setOppConnected(msg.opponent ? msg.opponent.connected : true);
+          if (msg.opponent) this.updateOppBar(msg.opponent.pct);
+          sendProgress(); // refresh their view of us too
+        } else if (msg.state === 'done' && !game.finished) {
+          // the race ended while we were away
+          if (msg.youWin && !msg.opponent) {
+            game.finished = true;
+            stopTimer();
+            showDefaultWin();
+          } else {
+            this.showRaceOver(msg.youWin, !!msg.opponent);
+          }
+        }
+        break;
+      }
+      case 'resume_failed': {
+        this.dropOut('The room is gone — we couldn’t rejoin.');
+        break;
+      }
       case 'opponent': {
-        const pct = Math.round((msg.pct || 0) * 100);
-        $('race-fill-them').style.width = `${pct}%`;
-        $('race-runner-them').style.left = `${pct}%`;
+        this.updateOppBar(msg.pct);
+        break;
+      }
+      case 'opponent_dropped': {
+        this.setOppConnected(false);
+        const oppName = this.opponent ? this.opponent.name : 'Your friend';
+        toast(`📶 ${oppName} lost connection — hang on, they can rejoin…`);
+        break;
+      }
+      case 'opponent_back': {
+        this.setOppConnected(true);
+        this.updateOppBar(msg.pct);
+        const oppName = this.opponent ? this.opponent.name : 'Your friend';
+        toast(`💗 ${oppName} is back!`);
+        sendProgress();
+        break;
+      }
+      case 'pong': {
+        clearTimeout(this.pongTimer);
+        this.pongTimer = null;
         break;
       }
       case 'race_over': {
-        game.finished = true;
-        stopTimer();
-        const oppName = this.opponent ? this.opponent.name : 'Your friend';
-        if (msg.youWin) {
-          showResult({
-            title: 'You win! 🏆',
-            sub: `You out-puzzled ${oppName}!`,
-            mood: 'celebrate',
-            stats: soloStats(),
-            buttons: this.rematchButtons(),
-          });
-          burstConfetti();
-          sound.win();
-        } else {
-          showResult({
-            title: 'So close! 🐢',
-            sub: `${oppName} finished first — rematch?`,
-            mood: 'sad',
-            stats: soloStats(),
-            buttons: this.rematchButtons(),
-          });
-        }
+        this.showRaceOver(msg.youWin);
         break;
       }
       case 'opponent_left': {
         toast('👋 Your friend left the race');
+        this.setOppConnected(true); // clear any "reconnecting…" state
         if (!game.finished && $('screen-game').classList.contains('active')) {
           game.finished = true;
           stopTimer();
-          showResult({
-            title: 'They ran away! 🏃',
-            sub: 'Your friend left — you win by default.',
-            mood: 'wow',
-            stats: soloStats(),
-            buttons: [
-              { label: '🏠 Home', cls: 'btn-lav', fn: () => { hideResult(); goHome(); } },
-            ],
-          });
+          showDefaultWin();
         } else if ($('screen-lobby').classList.contains('active')) {
           // stay in lobby, someone else can still join
           $('lobby-status').textContent = 'Share this code with a friend!';
@@ -903,6 +1068,12 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight' && colOf(i) < 8) i += 1;
     selectCell(i);
   }
+});
+
+/* Coming back from a locked phone or a backgrounded tab: the socket may be
+   silently dead — verify it right away so the seat is reclaimed within grace. */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') net.checkAlive();
 });
 
 /* mascot pats! */

@@ -364,6 +364,9 @@ button { font-family: inherit; color: inherit; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* opponent's connection dropped — they may still come back */
+.racer-name.dropped { animation: dropped-pulse 1.2s ease-in-out infinite; }
+@keyframes dropped-pulse { 50% { opacity: 0.35; } }
 .race-track {
   position: relative;
   flex: 1;

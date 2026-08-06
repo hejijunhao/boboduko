@@ -88,11 +88,70 @@ if (h2.t !== 'start' || g2.t !== 'start') fail('rematch should start a new round
 if (JSON.stringify(h2.puzzle) === JSON.stringify(hStart.puzzle)) fail('rematch reused the old puzzle');
 ok('rematch starts a fresh round');
 
-// 9. guest disconnects mid-round → host is told
+// 9. ping/pong liveness check
+host.send({ t: 'ping' });
+const pong = await host.next();
+if (pong.t !== 'pong') fail(`expected pong, got ${JSON.stringify(pong)}`);
+ok('ping answered with pong');
+
+// 10. guest's socket dies mid-round → soft drop with a grace period, NOT game over
 guest.ws.close();
-const left = await host.next();
-if (left.t !== 'opponent_left') fail(`expected opponent_left, got ${JSON.stringify(left)}`);
-ok('disconnect notifies the other player');
+const dropped = await host.next();
+if (dropped.t !== 'opponent_dropped') fail(`expected opponent_dropped, got ${JSON.stringify(dropped)}`);
+if (!(dropped.graceSeconds > 0)) fail('opponent_dropped should carry graceSeconds');
+ok('mid-round socket death is a soft drop, not a forfeit');
+
+// 11. guest resumes on a fresh socket → same seat, full state back
+const guest2 = client('guest2');
+await guest2.open();
+guest2.send({ t: 'resume', code: created.code, playerId: g2.playerId });
+const resumed = await guest2.next();
+if (resumed.t !== 'resumed' || resumed.state !== 'playing') fail(`bad resume: ${JSON.stringify(resumed).slice(0, 120)}`);
+if (JSON.stringify(resumed.puzzle) !== JSON.stringify(h2.puzzle)) fail('resume returned the wrong puzzle');
+const back = await host.next();
+if (back.t !== 'opponent_back') fail(`expected opponent_back, got ${JSON.stringify(back)}`);
+ok('resume reattaches the seat and restores the round');
+
+// 12. progress still relays after the resume
+guest2.send({ t: 'progress', pct: 0.25 });
+const prog2 = await host.next();
+if (prog2.t !== 'opponent' || prog2.pct !== 0.25) fail(`bad post-resume relay: ${JSON.stringify(prog2)}`);
+ok('progress relays across the new socket');
+
+// 13. resume with a bogus id is rejected
+const stranger = client('stranger');
+await stranger.open();
+stranger.send({ t: 'resume', code: created.code, playerId: 'not-a-real-id' });
+const denied = await stranger.next();
+if (denied.t !== 'resume_failed') fail(`expected resume_failed, got ${JSON.stringify(denied)}`);
+stranger.ws.close();
+ok('bogus resume rejected');
+
+// 14. drop again and let the grace period lapse → NOW it becomes a real leave
+const graceMs = Number(process.env.BOBODUKO_GRACE_MS) || 90_000;
+guest2.ws.close();
+const dropped2 = await host.next();
+if (dropped2.t !== 'opponent_dropped') fail(`expected opponent_dropped, got ${JSON.stringify(dropped2)}`);
+const left = await host.next(graceMs + 3000);
+if (left.t !== 'opponent_left') fail(`expected opponent_left after grace, got ${JSON.stringify(left)}`);
+ok('expired grace converts the drop into a real leave');
+
+// 15. a host alone in the lobby survives a socket death (serverless cut) and resumes
+const host2 = client('host2');
+await host2.open();
+host2.send({ t: 'create', difficulty: 'easy', name: 'Lobby Bunny', emoji: '🐰' });
+const created2 = await host2.next();
+host2.ws.close();
+await new Promise((r) => setTimeout(r, 150));
+const host3 = client('host3');
+await host3.open();
+host3.send({ t: 'resume', code: created2.code, playerId: created2.playerId });
+const lobbyResume = await host3.next();
+if (lobbyResume.t !== 'resumed' || lobbyResume.state !== 'waiting') {
+  fail(`lobby resume broken: ${JSON.stringify(lobbyResume).slice(0, 120)}`);
+}
+host3.ws.close();
+ok('lobby host survives a socket cut and reclaims the room');
 
 host.ws.close();
 console.log('\n🍡 all race tests passed');
