@@ -42,6 +42,14 @@ const until = (cond, what, timeout = 8000) => new Promise((resolve, reject) => {
   })();
 });
 
+// Keep a handle on every socket the app opens, so a test can kill one the way
+// the host does — abruptly, mid-round — and watch the app cope.
+const NativeWebSocket = globalThis.WebSocket;
+const appSockets = [];
+globalThis.WebSocket = class extends NativeWebSocket {
+  constructor(...args) { super(...args); appSockets.push(this); }
+};
+
 await import('../public/js/app.js');
 ok('app.js booted in jsdom without throwing');
 
@@ -211,6 +219,36 @@ await until(() => !$('#result-overlay').classList.contains('hidden'), 'race resu
 if (!$('#result-title').textContent.includes('win')) fail(`unexpected race result: ${$('#result-title').textContent}`);
 await until(() => guestMsgs.some((m) => m.t === 'race_over' && m.youWin === false), 'guest race_over');
 ok('race finish verified by server — win overlay for host, loss for guest');
+
+/* ───────── a finish completed during a blackout still counts ─────────
+   The host recycles the function every 300 s, killing both sockets, and the
+   browser can take another ~15 s to notice. Solving the board in that window
+   used to be silent ruin: the `finish` went nowhere, no overlay ever came,
+   and the opponent went on to win a race that was already over. */
+
+const rematchBtn = $$('#result-buttons button').find((b) => b.textContent.includes('Rematch'));
+if (!rematchBtn) fail('no rematch button on the race result overlay');
+click(rematchBtn);
+guest.send(JSON.stringify({ t: 'rematch' }));
+await until(() => active() === 'screen-game' && $('#result-overlay').classList.contains('hidden'),
+  'rematch round started', 15000);
+await until(() => $$('#board .cell').some((c) => !c.textContent.trim()), 'fresh board dealt', 15000);
+ok('rematch dealt a fresh board');
+
+const liveSocket = appSockets[appSockets.length - 1];
+liveSocket.close(); // the platform cut, exactly as production does it
+const hintBtn3 = $('[data-action="hint"]');
+for (let i = 0; i < 82 && $('#result-overlay').classList.contains('hidden'); i++) click(hintBtn3);
+if (!$('#result-overlay').classList.contains('hidden')) fail('overlay appeared without the server verdict');
+
+await until(() => !$('#result-overlay').classList.contains('hidden'),
+  'win overlay after reconnecting with a queued finish', 20000);
+if (!$('#result-title').textContent.includes('win')) {
+  fail(`solved during a blackout but did not win: ${$('#result-title').textContent}`);
+}
+await until(() => guestMsgs.filter((m) => m.t === 'race_over' && m.youWin === false).length >= 2,
+  'guest told they lost the second round', 10000);
+ok('a board finished during a blackout is re-sent on resume and still wins');
 
 guest.close();
 console.log('\n🍡 all client tests passed');

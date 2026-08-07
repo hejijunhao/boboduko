@@ -631,6 +631,11 @@ function goHome() {
 
 /* ══════════════════════ multiplayer ══════════════════════ */
 
+/* Worth re-sending after a blackout: these carry the result of the race or
+   our place in it. Handshakes (create/join/resume) and pings are not — they
+   only make sense on the socket that asked. */
+const QUEUEABLE = new Set(['finish', 'progress', 'rematch']);
+
 const net = {
   ws: null,
   roomCode: null,
@@ -642,6 +647,10 @@ const net = {
   reconnectTimer: null,
   reconnectAttempt: 0,
   pongTimer: null,
+  graceMs: 90_000, // replaced by the server's real figure on created/start/resumed
+  retryUntil: 0, // wall-clock deadline for reclaiming our seat
+  resumeDenials: 0, // consecutive "room is gone" answers (often just the wrong instance)
+  outbox: [], // messages that must survive a blackout (see send)
 
   connect() {
     return new Promise((resolve, reject) => {
@@ -660,8 +669,29 @@ const net = {
     });
   },
 
+  /* A socket can be dead for ~15 s before the browser reports it — measured
+     against production, where the host recycles the function every 300 s. A
+     `finish` dropped into that window used to vanish silently: you completed
+     the board, no overlay ever came (it only arrives as the server's
+     `race_over`), and your opponent went on to win a race you had already
+     won. So the messages that decide the game are held and re-sent on resume. */
   send(msg) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(msg));
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(msg));
+      return true;
+    }
+    if (QUEUEABLE.has(msg.t)) {
+      // only our newest position is worth keeping; verdicts all are
+      if (msg.t === 'progress') this.outbox = this.outbox.filter((m) => m.t !== 'progress');
+      this.outbox.push(msg);
+    }
+    return false;
+  },
+
+  flushOutbox() {
+    const pending = this.outbox;
+    this.outbox = [];
+    for (const m of pending) this.send(m);
   },
 
   /* ── reconnect & resume ──
@@ -674,18 +704,26 @@ const net = {
     clearTimeout(this.pongTimer);
     this.pongTimer = null;
     if (!this.roomCode || !this.playerId) return; // not in a room — nothing to restore
+    // Keep trying for as long as the server says the seat is ours. The old
+    // budget was a flat 8 attempts (~45 s) against a 90 s grace, so a blip
+    // just longer than the retries made us abandon a seat that was still
+    // being held — and the friend still at the board was told we had quit.
+    if (!this.retryUntil) this.retryUntil = Date.now() + this.graceMs;
     if (this.reconnectAttempt === 0) toast('📶 Connection hiccup — reconnecting…');
     this.scheduleReconnect();
   },
 
   scheduleReconnect() {
     if (this.reconnectTimer || !this.roomCode) return;
-    if (this.reconnectAttempt >= 8) { // ~45s of retries; the server holds our seat for 90s
-      this.reconnectAttempt = 0;
+    if (Date.now() >= this.retryUntil) {
       this.dropOut('We couldn’t get back in — check your connection.');
       return;
     }
-    const delay = Math.min(500 * 2 ** this.reconnectAttempt, 10_000);
+    // Jitter matters here: both players are cut at the same instant, so
+    // reconnecting in lockstep is what gets them load-balanced onto different
+    // instances in the first place.
+    const backoff = Math.min(500 * 2 ** this.reconnectAttempt, 10_000);
+    const delay = backoff * (0.6 + Math.random() * 0.8);
     this.reconnectAttempt++;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
@@ -693,42 +731,79 @@ const net = {
     }, delay);
   },
 
+  /* Back from a locked phone, a tunnel, or a dead Wi-Fi router. Timers do not
+     run while a tab is frozen, so the deadline may already have passed without
+     a single attempt having been made — give the seat a fresh honest try and
+     let the server, not a stopwatch, be the one to say it is gone. */
+  retryNow() {
+    if (!this.roomCode || (this.ws && this.ws.readyState === WebSocket.OPEN)) return;
+    this.reconnectAttempt = 0;
+    this.resumeDenials = 0;
+    this.retryUntil = Date.now() + this.graceMs;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.tryResume();
+  },
+
   async tryResume() {
     if (!this.roomCode) return;
     try { await this.connect(); } catch { return this.scheduleReconnect(); }
-    this.send({ t: 'resume', code: this.roomCode, playerId: this.playerId });
+    this.send({
+      t: 'resume',
+      code: this.roomCode,
+      playerId: this.playerId,
+      name: me.name,
+      emoji: me.emoji,
+      snapshot: this.snapshot(),
+    });
+  },
+
+  /* Everything needed to stand this round back up if the server has forgotten
+     it — the host recycles the instance holding our room out from under us.
+     The board is already entirely local, so carrying it costs us nothing. */
+  snapshot() {
+    if (game.mode !== 'race' || !game.puzzle || !game.solution) return null;
+    // A race that is already over must not be stood back up as if it were
+    // still running — unless we are still carrying a winning board that never
+    // made it through, in which case the room has to exist to receive it.
+    if (game.finished && !this.outbox.some((m) => m.t === 'finish')) return null;
+    return {
+      difficulty: game.difficulty,
+      puzzle: game.puzzle,
+      solution: game.solution,
+      pct: progressPct(),
+    };
   },
 
   /* Mobile browsers freeze sockets while backgrounded — on return the socket
      can look OPEN but be long dead on the server. Verify with a ping. */
   checkAlive() {
     if (!this.roomCode) return;
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      this.reconnectAttempt = 0;
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-      return this.tryResume();
-    }
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return this.retryNow();
     this.send({ t: 'ping' });
     clearTimeout(this.pongTimer);
     this.pongTimer = setTimeout(() => { if (this.ws) this.ws.close(); }, 4000);
   },
 
-  /* Reconnection genuinely failed — leave the race gracefully. */
+  /* Reconnection genuinely failed. The board, the timer and the solution are
+     all local, so losing the race is no reason to confiscate the puzzle: drop
+     the multiplayer half and let them finish what they were in the middle of
+     solving. Ending the game here was the harshest part of a lost connection. */
   dropOut(reason) {
     const wasRacing = game.mode === 'race' && !game.finished;
     this.roomCode = null;
     this.playerId = null;
+    this.opponent = null;
+    this.outbox = [];
+    this.retryUntil = 0;
+    this.resumeDenials = 0;
+    this.reconnectAttempt = 0;
+    clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
     if (wasRacing) {
-      game.finished = true;
-      stopTimer();
-      showResult({
-        title: 'Connection lost 😿',
-        sub: reason,
-        mood: 'sad',
-        stats: soloStats(),
-        buttons: [{ label: '🏠 Home', cls: 'btn-lav', fn: () => { hideResult(); goHome(); } }],
-      });
+      game.mode = 'solo';
+      $('race-hud').classList.add('hidden');
+      toast(`😿 ${reason} Finish this one solo!`);
     } else {
       toast(`😿 ${reason}`);
       if ($('screen-lobby').classList.contains('active')) showScreen('screen-race');
@@ -768,6 +843,9 @@ const net = {
     this.oppConnected = true;
     this.rematchAsked = false;
     this.reconnectAttempt = 0;
+    this.retryUntil = 0;
+    this.resumeDenials = 0;
+    this.outbox = [];
     clearTimeout(this.reconnectTimer);
     this.reconnectTimer = null;
   },
@@ -821,6 +899,8 @@ const net = {
       case 'created': {
         this.roomCode = msg.code;
         this.playerId = msg.playerId;
+        this.resumeDenials = 0;
+        if (msg.graceSeconds) this.graceMs = msg.graceSeconds * 1000;
         $('room-code').textContent = msg.code;
         $('lobby-status').textContent = 'Share this code with a friend!';
         $('lobby-difficulty').textContent =
@@ -833,6 +913,10 @@ const net = {
         this.playerId = msg.playerId;
         this.opponent = msg.opponent;
         this.rematchAsked = false;
+        this.outbox = [];
+        this.retryUntil = 0;
+        this.resumeDenials = 0;
+        if (msg.graceSeconds) this.graceMs = msg.graceSeconds * 1000;
         hideResult();
         this.setupRaceHud(msg.opponent);
         runCountdown(() => {
@@ -842,6 +926,9 @@ const net = {
       }
       case 'resumed': {
         this.reconnectAttempt = 0;
+        this.retryUntil = 0;
+        this.resumeDenials = 0;
+        if (msg.graceSeconds) this.graceMs = msg.graceSeconds * 1000;
         toast('✅ Reconnected!');
         if (msg.state === 'waiting') break; // still alone in the lobby — nothing to restore
         if (msg.opponent) this.opponent = { name: msg.opponent.name, emoji: msg.opponent.emoji };
@@ -853,11 +940,16 @@ const net = {
             hideResult();
             this.setupRaceHud(this.opponent);
             startGame({ puzzle: msg.puzzle, solution: msg.solution, difficulty: msg.difficulty, mode: 'race' });
+            this.outbox = []; // anything queued was about a board we no longer hold
           }
-          this.setOppConnected(msg.opponent ? msg.opponent.connected : true);
+          // no opponent in a live round means we just rebuilt the room and are
+          // waiting for them to find their way back to it
+          this.setOppConnected(msg.opponent ? msg.opponent.connected : false);
           if (msg.opponent) this.updateOppBar(msg.opponent.pct);
+          this.flushOutbox(); // a finish completed during the blackout still counts
           sendProgress(); // refresh their view of us too
         } else if (msg.state === 'done' && !game.finished) {
+          this.outbox = []; // the race resolved without us — nothing left to claim
           // the race ended while we were away
           if (msg.youWin && !msg.opponent) {
             game.finished = true;
@@ -870,6 +962,15 @@ const net = {
         break;
       }
       case 'resume_failed': {
+        // Often this only means we reached the wrong machine: rooms live in
+        // one instance's memory and every reconnect is routed independently.
+        // A fresh socket may well land on the one still holding our seat, so
+        // ask again a few times before believing the room is really gone.
+        if (this.resumeDenials < 4) {
+          this.resumeDenials++;
+          if (this.ws) this.ws.close(); // handleClose schedules the next try
+          break;
+        }
         this.dropOut('The room is gone — we couldn’t rejoin.');
         break;
       }
@@ -914,7 +1015,9 @@ const net = {
         break;
       }
       case 'rematch_wait': {
-        toast('💌 Rematch request sent — waiting for your friend…');
+        toast(msg.opponentAway
+          ? '💌 Rematch saved — we’ll ask the moment your friend is back…'
+          : '💌 Rematch request sent — waiting for your friend…');
         break;
       }
       case 'rematch_asked': {
@@ -1075,6 +1178,11 @@ document.addEventListener('keydown', (e) => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') net.checkAlive();
 });
+
+/* The radio came back — tunnel, lift, lost router, cellular handoff. A frozen
+   or offline tab runs no timers, so this is often the first real chance we get
+   to reclaim the seat, however long the outage lasted. */
+window.addEventListener('online', () => net.retryNow());
 
 /* mascot pats! */
 homeMascot.addEventListener('pointerdown', () => {

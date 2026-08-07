@@ -127,16 +127,41 @@ if (denied.t !== 'resume_failed') fail(`expected resume_failed, got ${JSON.strin
 stranger.ws.close();
 ok('bogus resume rejected');
 
-// 14. drop again and let the grace period lapse → NOW it becomes a real leave
-const graceMs = Number(process.env.BOBODUKO_GRACE_MS) || 90_000;
+// 14. a mid-round drop is held far longer than an idle one. This is the bug
+//     that kept ending real games: the host cuts every socket on a timer, and
+//     a seat recycled while its player was still reconnecting told the friend
+//     at the board "they ran away" about someone who never left.
+const idleMs = Number(process.env.BOBODUKO_GRACE_MS) || 90_000;
+const playMs = Number(process.env.BOBODUKO_PLAY_GRACE_MS) || 15 * 60_000;
+if (!(playMs > idleMs)) fail('mid-round grace must outlast the idle grace');
+
 guest2.ws.close();
 const dropped2 = await host.next();
 if (dropped2.t !== 'opponent_dropped') fail(`expected opponent_dropped, got ${JSON.stringify(dropped2)}`);
-const left = await host.next(graceMs + 3000);
-if (left.t !== 'opponent_left') fail(`expected opponent_left after grace, got ${JSON.stringify(left)}`);
-ok('expired grace converts the drop into a real leave');
+if (Math.round(dropped2.graceSeconds) !== Math.round(playMs / 1000)) {
+  fail(`mid-round drop should advertise the play grace, got ${dropped2.graceSeconds}s`);
+}
+// still seated well past the point where an idle seat would have been recycled
+await new Promise((r) => setTimeout(r, idleMs + 500));
+const guest3 = client('guest3');
+await guest3.open();
+guest3.send({ t: 'resume', code: created.code, playerId: g2.playerId });
+const lateResume = await guest3.next();
+if (lateResume.t !== 'resumed' || lateResume.state !== 'playing') {
+  fail(`seat should survive past the idle grace mid-round, got ${JSON.stringify(lateResume).slice(0, 120)}`);
+}
+await host.next(); // opponent_back
+ok('a mid-round seat outlives the idle grace — a slow reconnect is not a forfeit');
 
-// 15. a host alone in the lobby survives a socket death (serverless cut) and resumes
+// 15. let the mid-round grace itself lapse → only now is it a real leave
+guest3.ws.close();
+const dropped3 = await host.next();
+if (dropped3.t !== 'opponent_dropped') fail(`expected opponent_dropped, got ${JSON.stringify(dropped3)}`);
+const left = await host.next(playMs + 3000);
+if (left.t !== 'opponent_left') fail(`expected opponent_left after play grace, got ${JSON.stringify(left)}`);
+ok('expired mid-round grace converts the drop into a real leave');
+
+// 16. a host alone in the lobby survives a socket death (serverless cut) and resumes
 const host2 = client('host2');
 await host2.open();
 host2.send({ t: 'create', difficulty: 'easy', name: 'Lobby Bunny', emoji: '🐰' });
@@ -152,6 +177,79 @@ if (lobbyResume.t !== 'resumed' || lobbyResume.state !== 'waiting') {
 }
 host3.ws.close();
 ok('lobby host survives a socket cut and reclaims the room');
+
+/* ── 17. the instance holding a room is gone: rebuild it from the players ──
+   Measured against production, this is the common case at a platform cut —
+   both players reconnect at once and get routed to a machine that has never
+   heard of their room. They carry the whole round between them, so the first
+   one back stands it up again and the second takes the empty chair. */
+
+const alice = client('alice');
+const bob = client('bob');
+await Promise.all([alice.open(), bob.open()]);
+alice.send({ t: 'create', difficulty: 'easy', name: 'Alice', emoji: '🦊' });
+const aRoom = await alice.next();
+bob.send({ t: 'join', code: aRoom.code, name: 'Bob', emoji: '🦉' });
+const [aStart, bStart] = await Promise.all([alice.next(), bob.next()]);
+const snapshot = {
+  difficulty: aStart.difficulty,
+  puzzle: aStart.puzzle,
+  solution: aStart.solution,
+  pct: 0.3,
+};
+
+// Wipe the room the way a recycled instance does: both seats vanish together
+// and nothing of the round is left server-side. Letting both graces lapse
+// empties the room and deletes it, which is the same end state.
+alice.ws.close();
+bob.ws.close();
+await new Promise((r) => setTimeout(r, playMs + 1000));
+
+// a bogus solution must not be able to stand a room up
+const forger = client('forger');
+await forger.open();
+forger.send({
+  t: 'resume',
+  code: aRoom.code,
+  playerId: aStart.playerId,
+  name: 'Forger',
+  emoji: '🦝',
+  snapshot: { ...snapshot, solution: new Array(81).fill(1) },
+});
+const forged = await forger.next();
+if (forged.t !== 'resume_failed') fail(`a non-sudoku snapshot rebuilt a room: ${JSON.stringify(forged).slice(0, 90)}`);
+forger.ws.close();
+ok('a snapshot that is not a real solved grid cannot rebuild a room');
+
+// the real players rebuild it and find each other again
+const alice2 = client('alice2');
+await alice2.open();
+alice2.send({ t: 'resume', code: aRoom.code, playerId: aStart.playerId, name: 'Alice', emoji: '🦊', snapshot });
+const aBack = await alice2.next();
+if (aBack.t !== 'resumed' || aBack.state !== 'playing') fail(`rebuild failed: ${JSON.stringify(aBack).slice(0, 120)}`);
+if (JSON.stringify(aBack.puzzle) !== JSON.stringify(aStart.puzzle)) fail('rebuilt room has the wrong board');
+if (aBack.opponent) fail('rebuilt room should start with the other chair empty');
+ok('the first player back rebuilds the room with the same board');
+
+const bob2 = client('bob2');
+await bob2.open();
+bob2.send({ t: 'resume', code: aRoom.code, playerId: bStart.playerId, name: 'Bob', emoji: '🦉', snapshot });
+const bBack = await bob2.next();
+if (bBack.t !== 'resumed' || bBack.state !== 'playing') fail(`re-seat failed: ${JSON.stringify(bBack).slice(0, 120)}`);
+if (bBack.opponent?.name !== 'Alice') fail(`expected Alice across the table, got ${JSON.stringify(bBack.opponent)}`);
+const aliceSeesBob = await alice2.next();
+if (aliceSeesBob.t !== 'opponent_back') fail(`expected opponent_back, got ${aliceSeesBob.t}`);
+ok('the second player re-seats and the two are racing each other again');
+
+// and the race still resolves correctly on the rebuilt room
+bob2.send({ t: 'finish', board: bStart.solution });
+const [bOver, aOver] = await Promise.all([bob2.next(), alice2.next()]);
+if (!(bOver.t === 'race_over' && bOver.youWin === true)) fail('rebuilt room did not award the win');
+if (!(aOver.t === 'race_over' && aOver.youWin === false)) fail('rebuilt room did not notify the loser');
+ok('a rebuilt room still referees the finish');
+
+alice2.ws.close();
+bob2.ws.close();
 
 host.ws.close();
 console.log('\n🍡 all race tests passed');

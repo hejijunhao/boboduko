@@ -3,6 +3,104 @@
 All notable changes to Boboduko are documented here. Format loosely follows
 [Keep a Changelog](https://keepachangelog.com); versions follow semver.
 
+## [1.5.0] — 2026-08-07
+
+"They ran away!" came back, so this time the platform was measured instead of
+reasoned about. A two-player probe run against production, three times over
+the 300 s socket cut, found the real culprit — and it is the exact thing 1.4.0
+listed under *Notes* as a theoretical limit and dismissed:
+
+```
+[301.0s] HUSBAND  opponent_dropped (grace 90s)
+[314.6s] HUSBAND  socket CLOSED 1006      ← the platform cut, both at once
+[314.6s] WIFE     socket CLOSED 1006
+[315.6s] WIFE     resumed        ← landed on the instance holding the room
+[315.7s] HUSBAND  resume_failed  ← landed on a different one
+[392.8s] WIFE     opponent_left  ← "They ran away!" about someone still playing
+```
+
+Rooms live in one function instance's memory. 1.4.0 assumed that at
+friends-and-family traffic there is only ever one warm instance, so a reconnect
+lands home. That is true right up to the moment it matters: **the cut is itself
+what creates the churn**, both players reconnect within a second of each other,
+and they get load-balanced apart. Across three runs the room survived once,
+lost one player once, and lost both once. A 20-minute race takes about four
+cuts, so a long game was near-certain to break.
+
+The fix stops treating an absent room as proof of anything. Both players
+already hold the entire round — code, board, solution, and their own seat
+token — so if the server has forgotten it, the first one back rebuilds it and
+the second slots into the empty chair.
+
+### Fixed — A forgotten room is rebuilt, not a forfeit (`server.js`, `public/js/app.js`)
+
+- **`resume` now carries a snapshot** (difficulty, puzzle, solution, progress).
+  Reaching an instance that has never heard of the room rebuilds it there;
+  a returning player whose seat went down with the old instance takes the free
+  chair on proof of the round. Validated, not trusted: a snapshot must be a
+  genuinely solved grid whose puzzle is that grid with holes punched in it —
+  otherwise a bad one could stand up a room whose "solution" rejects the other
+  player's correct board.
+- **`resume_failed` is retried** (up to four times on fresh sockets) before it
+  is believed. Every reconnect is routed independently, so the next socket may
+  well reach the instance still holding the seat.
+- **Reconnect backoff is jittered.** Both clients are cut in the same instant,
+  and reconnecting in lockstep is what got them split across instances.
+
+### Fixed — Solving the board during a blackout no longer loses the race
+
+- The server sees a socket die ~14 s before the browser does (measured). A
+  `finish` sent in that window went to `net.send` on a dead socket and was
+  **silently dropped** — the overlay only ever arrives as the server's
+  `race_over`, so the board was completed and *nothing happened*, while the
+  opponent went on to win a race that was already over. Messages that decide
+  the game (`finish`, `progress`, `rematch`) are now queued and re-sent on
+  resume.
+
+### Fixed — The waits are sized by what is at stake
+
+- **Mid-round grace is 15 min** (`BOBODUKO_PLAY_GRACE_MS`); lobbies and
+  finished rooms still recycle at 90 s (`BOBODUKO_GRACE_MS`). The player still
+  at the board loses nothing while we wait — they keep solving and can still
+  win — whereas evicting early ends their race with a lie.
+- **The client's retry budget comes from the server** (`graceSeconds` on
+  `created`/`start`/`resumed`) instead of a flat 8 attempts. It was ~45 s
+  against a 90 s grace, so a blip just longer than the retries abandoned a seat
+  that was still being held.
+- **A new `online` listener** and a wake-up path that always makes one honest
+  attempt: a frozen tab runs no timers, so the deadline can lapse without a
+  single try having been made. The server, not a stopwatch, decides the seat is
+  gone.
+- **A failed reconnect no longer confiscates the puzzle.** The board, timer and
+  solution are all local, so the race is dropped and the player finishes solo
+  instead of being shown a dead end.
+- **Rematch tells the truth** when the invite lands on a dead socket.
+
+### Changed — `vercel.json`
+
+- `maxDuration: 800` (Pro ceiling) instead of the 300 s default: roughly one
+  cut per 13-minute race instead of four.
+
+### Added — Tests
+
+- `race.test.js`: a mid-round seat outlives the idle grace; only the mid-round
+  grace lapsing is a real leave; a room deleted entirely is rebuilt by the
+  first player back, re-seats the second, and still referees the finish; a
+  snapshot that is not a real solved grid cannot rebuild anything.
+- `client.test.js`: wraps `WebSocket` to keep a handle on the app's own socket,
+  kills it mid-round, solves the board during the blackout, and asserts the win
+  still lands after the reconnect. Verified to fail without the fix.
+
+### Notes
+
+- This does not make the game correct on serverless, it makes it resilient.
+  Two players can still end up on different instances and race in parallel
+  universes until the grace lapses; the rebuild just means nobody is ejected
+  and no board is taken away. The real fix is a single long-lived process
+  (`server.js` already is one — Fly.io/Railway/Render need no code change) or
+  shared state plus pub/sub, since the sockets themselves live on different
+  machines.
+
 ## [1.4.0] — 2026-08-06
 
 Mid-race "They ran away!" kicks, diagnosed and fixed. On Vercel the game

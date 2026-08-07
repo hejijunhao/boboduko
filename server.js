@@ -44,10 +44,61 @@ const server = http.createServer(async (req, res) => {
 const rooms = new Map(); // code -> room
 
 // How long a dropped player keeps their seat before they truly forfeit.
-// Serverless hosts (Vercel) cut every WebSocket when the function hits its
-// maxDuration, and phones drop sockets on lock/network handoff — so a dead
-// socket is routine, not proof the player left.
-const GRACE_MS = Number(process.env.BOBODUKO_GRACE_MS) || 90_000;
+//
+// Serverless hosts cut every WebSocket when the function hits its maxDuration
+// — on Vercel that is every 300 s by default — and the client only notices the
+// death some seconds later, so a long race is a chain of blackouts, each one a
+// fresh chance to lose the seat. Phones add their own: lock, tunnel, handoff.
+//
+// So the two waits are sized by what is actually at stake. Mid-round we are
+// very patient: the player still at the board loses nothing while we wait
+// (they keep solving, and can still win), whereas evicting too early ends
+// their race with a lie — "they ran away" about someone sitting right there.
+// An idle lobby or a finished room recycles quickly instead, so codes free up.
+const PLAY_GRACE_MS = Number(process.env.BOBODUKO_PLAY_GRACE_MS) || 15 * 60_000;
+const IDLE_GRACE_MS = Number(process.env.BOBODUKO_GRACE_MS) || 90_000;
+const graceFor = (room) => (room.state === 'playing' ? PLAY_GRACE_MS : IDLE_GRACE_MS);
+
+const DIFFICULTIES = new Set(['easy', 'medium', 'hard', 'superhard', 'expert']);
+
+/* ─────────── standing a forgotten room back up ───────────
+
+   Rooms live in one function instance's memory, and the platform recycles
+   instances on its own schedule. Measured against production: at the 300 s
+   cut both players reconnect within a second of each other, and roughly two
+   times in three at least one of them is routed to an instance that has never
+   heard of the room — which used to eject them and tell the other "they ran
+   away". But nothing about the round is really the server's: both players
+   already hold the code, the board and the solution, and each holds their own
+   seat token. So the first one back can rebuild the room and the second slots
+   into the empty chair.
+
+   None of it is taken on faith. A snapshot has to be a genuinely solved grid
+   whose puzzle is that same grid with holes in it — otherwise a bad one could
+   stand up a room whose "solution" rejects the other player's correct board. */
+
+const isGrid = (g) => Array.isArray(g) && g.length === 81
+  && g.every((n) => Number.isInteger(n) && n >= 0 && n <= 9);
+
+function isSolvedGrid(g) {
+  if (!isGrid(g) || g.includes(0)) return false;
+  for (let i = 0; i < 9; i++) {
+    const row = new Set(), col = new Set(), box = new Set();
+    for (let j = 0; j < 9; j++) {
+      row.add(g[i * 9 + j]);
+      col.add(g[j * 9 + i]);
+      box.add(g[(Math.floor(i / 3) * 3 + Math.floor(j / 3)) * 9 + (i % 3) * 3 + (j % 3)]);
+    }
+    if (row.size !== 9 || col.size !== 9 || box.size !== 9) return false;
+  }
+  return true;
+}
+
+const validSnapshot = (s) => !!s && DIFFICULTIES.has(s.difficulty) && isSolvedGrid(s.solution)
+  && isGrid(s.puzzle) && s.puzzle.every((n, i) => n === 0 || n === s.solution[i]);
+
+// they must be talking about the round this room is actually running
+const sameRound = (room, snap) => isGrid(room.puzzle) && room.puzzle.every((n, i) => n === snap.puzzle[i]);
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // no I/O — they read like 1/0
 function makeCode() {
@@ -92,6 +143,9 @@ function startRound(room) {
       puzzle,
       solution,
       opponent: { name: opp.name, emoji: opp.emoji },
+      // how long this seat survives a dead socket — the client sizes its own
+      // reconnect budget from this so the two can never drift apart
+      graceSeconds: Math.round(PLAY_GRACE_MS / 1000),
     });
   }
   console.log(`[room ${room.code}] round started (${room.difficulty})`);
@@ -107,14 +161,15 @@ function dropPlayer(ws) {
   ws.room = null;
   if (!player) return;
   player.ws = null;
+  const grace = graceFor(room);
   const opp = opponentOf(room, player);
-  if (opp) send(opp.ws, { t: 'opponent_dropped', graceSeconds: Math.round(GRACE_MS / 1000) });
+  if (opp) send(opp.ws, { t: 'opponent_dropped', graceSeconds: Math.round(grace / 1000) });
   clearTimeout(player.graceTimer);
   player.graceTimer = setTimeout(() => {
     console.log(`[room ${room.code}] grace expired for ${player.name}`);
     removePlayer(room, player);
-  }, GRACE_MS);
-  console.log(`[room ${room.code}] ${player.name} dropped — ${GRACE_MS / 1000}s to resume`);
+  }, grace);
+  console.log(`[room ${room.code}] ${player.name} dropped — ${grace / 1000}s to resume`);
 }
 
 /* Permanent removal: an explicit leave or an expired grace period. */
@@ -158,7 +213,7 @@ wss.on('connection', (ws) => {
         const player = newPlayer(ws, msg);
         const newRoom = {
           code,
-          difficulty: msg.difficulty in { easy: 1, medium: 1, hard: 1, superhard: 1, expert: 1 } ? msg.difficulty : 'medium',
+          difficulty: DIFFICULTIES.has(msg.difficulty) ? msg.difficulty : 'medium',
           players: [player],
           state: 'waiting',
           winner: null,
@@ -167,7 +222,13 @@ wss.on('connection', (ws) => {
         };
         rooms.set(code, newRoom);
         ws.room = newRoom;
-        send(ws, { t: 'created', code, playerId: player.id, difficulty: newRoom.difficulty });
+        send(ws, {
+          t: 'created',
+          code,
+          playerId: player.id,
+          difficulty: newRoom.difficulty,
+          graceSeconds: Math.round(IDLE_GRACE_MS / 1000),
+        });
         console.log(`[room ${code}] created (${newRoom.difficulty})`);
         break;
       }
@@ -183,11 +244,47 @@ wss.on('connection', (ws) => {
         break;
       }
 
-      /* A returning player reattaches a fresh socket to their old seat. */
+      /* A returning player reattaches a fresh socket to their old seat — or,
+         if the instance that held the room is gone, rebuilds it (see above). */
       case 'resume': {
-        const target = rooms.get(String(msg.code || '').toUpperCase());
-        const player = target?.players.find((p) => p.id === msg.playerId);
-        if (!target || !player) return send(ws, { t: 'resume_failed' });
+        const code = String(msg.code || '').toUpperCase();
+        const snap = msg.snapshot;
+        let target = rooms.get(code);
+
+        if (!target && /^[A-Z]{4}$/.test(code) && validSnapshot(snap)) {
+          target = {
+            code,
+            difficulty: snap.difficulty,
+            players: [],
+            state: 'playing',
+            winner: null,
+            rematchVotes: new Set(),
+            createdAt: Date.now(),
+            puzzle: snap.puzzle,
+            solution: snap.solution,
+          };
+          rooms.set(code, target);
+          console.log(`[room ${code}] rebuilt by a returning player`);
+        }
+
+        let player = target?.players.find((p) => p.id === msg.playerId);
+
+        // Their seat went down with the old instance, but the room is standing
+        // again — let them back into the empty chair on proof of the round.
+        if (target && !player && target.players.length < 2 && validSnapshot(snap) && sameRound(target, snap)) {
+          player = {
+            ...newPlayer(null, msg),
+            id: String(msg.playerId || '').slice(0, 64) || randomUUID(),
+            pct: Math.max(0, Math.min(1, Number(snap.pct) || 0)),
+          };
+          target.players.push(player);
+          console.log(`[room ${code}] ${player.name} reclaimed a seat after an instance loss`);
+        }
+
+        if (!target || !player) {
+          if (target && target.players.length === 0) rooms.delete(target.code); // no empty husks
+          return send(ws, { t: 'resume_failed' });
+        }
         if (player.ws && player.ws !== ws) { player.ws.room = null; player.ws.close(); } // stale tab
         clearTimeout(player.graceTimer);
         player.graceTimer = null;
@@ -199,6 +296,7 @@ wss.on('connection', (ws) => {
           code: target.code,
           state: target.state,
           difficulty: target.difficulty,
+          graceSeconds: Math.round(graceFor(target) / 1000),
           puzzle: target.puzzle || null,
           solution: target.solution || null,
           opponent: opp ? { name: opp.name, emoji: opp.emoji, connected: !!opp.ws, pct: opp.pct } : null,
@@ -242,11 +340,13 @@ wss.on('connection', (ws) => {
         if (!player) return;
         if (room.players.length < 2) return send(ws, { t: 'error', msg: 'Your friend already left!' });
         room.rematchVotes.add(player.id);
+        const opp = opponentOf(room, player);
         if (room.rematchVotes.size >= 2) {
           startRound(room);
         } else {
-          send(ws, { t: 'rematch_wait' });
-          const opp = opponentOf(room, player);
+          // Say so when the invite lands on a dead socket, rather than leaving
+          // them watching a spinner for a friend who cannot hear them yet.
+          send(ws, { t: 'rematch_wait', opponentAway: !(opp && opp.ws) });
           if (opp) send(opp.ws, { t: 'rematch_asked' });
         }
         break;
